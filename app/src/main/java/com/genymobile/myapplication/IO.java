@@ -8,7 +8,7 @@ import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
 
 public class IO {
-    public static void readFully(FileDescriptor fileDescriptor, ByteBuffer buffer,int len) {
+    public static int readFully(FileDescriptor fileDescriptor, ByteBuffer buffer,int len) {
         int bytesRead = 0;
         System.out.println("readFully len "+len);
         while (bytesRead < len) {
@@ -28,5 +28,6 @@ public class IO {
             }
         }
         System.out.println("byteRead end " + bytesRead);
+        return bytesRead;
     }
 }

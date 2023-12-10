@@ -63,13 +63,17 @@ public class InputStreamDecoder {
     private static final int DEFAULT_FRAME_RATE = 60; // fps
     int biteRate = 64000000;
     private static final int DEFAULT_I_FRAME_INTERVAL = 10; // seconds
+    private static final int REPEAT_FRAME_DELAY = 6; // repeat after 6 frames
 
+    private static final int MICROSECONDS_IN_ONE_SECOND = 1_000_000;
 
     private MediaFormat createFormat(int bitRate, int frameRate, int iFrameInterval, int w, int h) throws IOException {
         MediaFormat format = new MediaFormat();
         format.setString(MediaFormat.KEY_MIME, "video/avc");
         format.setInteger(MediaFormat.KEY_WIDTH, w);
         format.setInteger(MediaFormat.KEY_HEIGHT, h);
+        format.setLong(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, MICROSECONDS_IN_ONE_SECOND * REPEAT_FRAME_DELAY / frameRate); // µs
+
 //        format.setInteger(MediaFormat.KEY_BIT_RATE,bitRate);
         return format;
     }
@@ -85,39 +89,42 @@ public class InputStreamDecoder {
 //        ByteBuffer byteBuffer = ByteBuffer.allocate(10_000_000);
 //        byteBuffer.compact();
         int byteSize = 250000 * 10;
-        byte[] header = new byte[4];
+        ByteBuffer header = ByteBuffer.allocate(4);
+        byte[] data = new byte[1000000];
+
         while (!eof) {
-//            header.clear();
-//            IO.readFully(fileDescriptor, header,header.length);
-            Os.read(fileDescriptor, header, 0, header.length);
-//            header.flip();
-            // 从 byte 数组中读取 int 值
-            int len = ((header[0] & 0xFF) << 24)
-                    | ((header[1] & 0xFF) << 16)
-                    | ((header[2] & 0xFF) << 8)
-                    | (header[3] & 0xFF);
+            header.clear();
+            IO.readFully(fileDescriptor, header, header.capacity());
+            header.flip();
+//             从 byte 数组中读取 int 值
+            int len = ((header.get() & 0xFF) << 24)
+                    | ((header.get() & 0xFF) << 16)
+                    | ((header.get() & 0xFF) << 8)
+                    | (header.get() & 0xFF);
             System.out.println("len " + len);
             int inputBufferId = mediaCodec.dequeueInputBuffer(-1);
-            if (inputBufferId >= 0) {
-                ByteBuffer inputBuffer = mediaCodec.getInputBuffer(inputBufferId);
-                inputBuffer.clear();
-                byte[] data = new byte[len];
-                int okSize = 0;
-                while (okSize<len) {
-                    okSize+= Os.read(fileDescriptor, data, okSize, len-okSize);
-                }
-                inputBuffer.put(data);
-//                IO.readFully(fileDescriptor, inputBuffer, len);
-                mediaCodec.queueInputBuffer(inputBufferId, 0, len, 0, 0);
+            if (inputBufferId < 0) {
+                continue;
             }
+            ByteBuffer inputBuffer = mediaCodec.getInputBuffer(inputBufferId);
+            inputBuffer.clear();
+//            int okSize = 0;
+//            while (okSize < len) {
+//                okSize += Os.read(fileDescriptor, data, okSize, len - okSize);
+//            }
+//            Os.read()
+//            inputBuffer.put(data);
+            inputBuffer.limit(len);
+            IO.readFully(fileDescriptor, inputBuffer, len);
+            mediaCodec.queueInputBuffer(inputBufferId, 0, len, 0, 0);
 
             int outputBufferId = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
             eof = (bufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0;
-            if (outputBufferId >= 0) {
-                // 将解码后的数据显示在SurfaceView上
-                mediaCodec.releaseOutputBuffer(outputBufferId, true);
+            if (outputBufferId < 0) {
+                continue;
             }
-//            break;
+            // 将解码后的数据显示在SurfaceView上
+            mediaCodec.releaseOutputBuffer(outputBufferId, true);
         }
     }
 
