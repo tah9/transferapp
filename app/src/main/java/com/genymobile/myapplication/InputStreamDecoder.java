@@ -86,12 +86,7 @@ public class InputStreamDecoder {
 
     public void decode(FileDescriptor fileDescriptor) throws Exception {
         boolean eof = false;
-//        ByteBuffer byteBuffer = ByteBuffer.allocate(10_000_000);
-//        byteBuffer.compact();
-        int byteSize = 250000 * 10;
         ByteBuffer header = ByteBuffer.allocate(4);
-        byte[] data = new byte[1000000];
-
         while (!eof) {
             header.clear();
             IO.readFully(fileDescriptor, header, header.capacity());
@@ -101,19 +96,13 @@ public class InputStreamDecoder {
                     | ((header.get() & 0xFF) << 16)
                     | ((header.get() & 0xFF) << 8)
                     | (header.get() & 0xFF);
-            System.out.println("len " + len);
+//            System.out.println("len " + len);
             int inputBufferId = mediaCodec.dequeueInputBuffer(-1);
             if (inputBufferId < 0) {
                 continue;
             }
             ByteBuffer inputBuffer = mediaCodec.getInputBuffer(inputBufferId);
             inputBuffer.clear();
-//            int okSize = 0;
-//            while (okSize < len) {
-//                okSize += Os.read(fileDescriptor, data, okSize, len - okSize);
-//            }
-//            Os.read()
-//            inputBuffer.put(data);
             inputBuffer.limit(len);
             IO.readFully(fileDescriptor, inputBuffer, len);
             mediaCodec.queueInputBuffer(inputBufferId, 0, len, 0, 0);
