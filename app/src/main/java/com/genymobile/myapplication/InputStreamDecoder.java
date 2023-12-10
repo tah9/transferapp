@@ -87,26 +87,28 @@ public class InputStreamDecoder {
         int byteSize = 250000 * 10;
         byte[] header = new byte[4];
         while (!eof) {
-            Os.read(fileDescriptor, header,0,4);
-//            IO.readFully(fileDescriptor, header, header.capacity());
-//            header.position(0);
+//            header.clear();
+//            IO.readFully(fileDescriptor, header,header.length);
+            Os.read(fileDescriptor, header, 0, header.length);
 //            header.flip();
             // 从 byte 数组中读取 int 值
             int len = ((header[0] & 0xFF) << 24)
                     | ((header[1] & 0xFF) << 16)
                     | ((header[2] & 0xFF) << 8)
-                    | ( header[3] & 0xFF);
-            System.out.println(" len " + len);
-//            header.position(0);
-            System.out.println(Arrays.toString(header));
-//            header.clear();
+                    | (header[3] & 0xFF);
+            System.out.println("len " + len);
             int inputBufferId = mediaCodec.dequeueInputBuffer(-1);
             if (inputBufferId >= 0) {
                 ByteBuffer inputBuffer = mediaCodec.getInputBuffer(inputBufferId);
                 inputBuffer.clear();
-                IO.readFully(fileDescriptor, inputBuffer, len);
+                byte[] data = new byte[len];
+                int okSize = 0;
+                while (okSize<len) {
+                    okSize+= Os.read(fileDescriptor, data, okSize, len-okSize);
+                }
+                inputBuffer.put(data);
+//                IO.readFully(fileDescriptor, inputBuffer, len);
                 mediaCodec.queueInputBuffer(inputBufferId, 0, len, 0, 0);
-                break;
             }
 
             int outputBufferId = mediaCodec.dequeueOutputBuffer(bufferInfo, 0);
@@ -115,7 +117,7 @@ public class InputStreamDecoder {
                 // 将解码后的数据显示在SurfaceView上
                 mediaCodec.releaseOutputBuffer(outputBufferId, true);
             }
-
+//            break;
         }
     }
 
