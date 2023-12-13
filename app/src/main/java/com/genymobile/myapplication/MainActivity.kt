@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.os.Build
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
-import android.view.MotionEvent
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -23,12 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.genymobile.myapplication.ui.theme.MyApplicationTheme
 import java.io.DataInputStream
-import java.io.DataOutput
 import java.io.DataOutputStream
-import java.io.ObjectInput
-import java.io.ObjectInputStream
-import java.io.ObjectOutputStream
 import java.net.ServerSocket
+import java.nio.ByteBuffer
 
 
 class MainActivity : ComponentActivity(), SurfaceHolder.Callback {
@@ -40,7 +36,7 @@ class MainActivity : ComponentActivity(), SurfaceHolder.Callback {
     var d_height: Int? = null
     var thread2_server: Thread? = null
 
-    var inputStreamDecoder: InputStreamDecoder? = null
+    var videoDecoder: VideoDecoder? = null
 
 
     @SuppressLint("ClickableViewAccessibility")
@@ -77,7 +73,6 @@ class MainActivity : ComponentActivity(), SurfaceHolder.Callback {
                                 }.also {
                                     test_surfaceView = it
                                     surface_holder = it.holder
-                                    surface = surface_holder?.surface
                                     // 设置 SurfaceHolder 的回调
                                     // 设置 SurfaceHolder 的回调
                                     surface_holder?.addCallback(temp)
@@ -98,19 +93,31 @@ class MainActivity : ComponentActivity(), SurfaceHolder.Callback {
 //                while (true) {
                 try {
                     // videoSocket
-                    val videoSocket = serverSocket.accept()
+                    var videoSocket = serverSocket.accept()
+                    var fileDescriptor =
+                        ParcelFileDescriptor.fromSocket(videoSocket).fileDescriptor
                     Thread {
                         println("video_socket客户端已连接")
-                        val dataInputStream = DataInputStream(videoSocket.inputStream)
-                        println("设备名" + dataInputStream.readUTF())
-                        val lParam: Int = dataInputStream.readInt()
+                        var header = ByteBuffer.allocate(/*64 +*/ 4)
+                        IO.readFully(fileDescriptor, header)
+                        header.flip()
+
+                        val lParam: Int = header.getInt()
                         d_width = lParam shr 16
                         d_height = lParam and 0xFFFF
+
                         println("$d_width,$d_height")
-//                        inputStreamDecoder = InputStreamDecoder(surface, d_width!!, d_height!!)
-//                        inputStreamDecoder = InputStreamDecoder(surface, 2560, 1800)
-                        inputStreamDecoder = InputStreamDecoder(surface, 1080, 2400)
-                        inputStreamDecoder?.decode(/*DataInputStream(videoSocket.getInputStream()),*/ParcelFileDescriptor.fromSocket(videoSocket).fileDescriptor)
+
+//                        val name = ByteArray(64)
+//                        println("设备名" + header.get(name))
+
+                        videoDecoder = VideoDecoder(
+                            fileDescriptor,
+                            videoSocket.getInputStream(),
+                            surface,
+                            d_width!!,
+                            d_height!!
+                        )
                     }.start()
 
                     //controlSocket
@@ -161,10 +168,11 @@ class MainActivity : ComponentActivity(), SurfaceHolder.Callback {
                 e.printStackTrace()
             }
         }
-        thread2_server?.start()
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
+        surface = holder.surface
+        thread2_server?.start()
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {

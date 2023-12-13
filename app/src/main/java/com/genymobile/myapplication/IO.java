@@ -4,24 +4,43 @@ import android.system.ErrnoException;
 import android.system.Os;
 
 import java.io.FileDescriptor;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.nio.ByteBuffer;
 
 public class IO {
-    public static int readFully(FileDescriptor fileDescriptor, ByteBuffer buffer, int len) {
-        int bytesRead = 0;
-//        System.out.println("readFully len "+len);
-        while (bytesRead < len) {
-//            System.out.println("byteRead start " + bytesRead);
-            int result = 0;
+    /*
+    before read must set byteBuffer limit
+     */
+    public static void readFully(FileDescriptor fileDescriptor, ByteBuffer buffer) {
+        int remaining = buffer.remaining();
+        System.out.println("remaining "+remaining);
+        while (remaining > 0) {
             try {
-                result = Os.read(fileDescriptor, buffer);
+                remaining -= Os.read(fileDescriptor, buffer);
             } catch (Exception e) {
+//                System.out.println(" read bad ...");
+
+                try {
+                    System.out.println("sleep..."+e);
+                    Thread.sleep(200);
+                } catch (InterruptedException ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
+        }
+        System.out.println("read finish ");
+    }
+
+    public static void readBytes(InputStream inputStream, byte[] volume,int size)  {
+        int finishSize=0;
+        while (finishSize<size){
+            try {
+                finishSize += inputStream.read(volume, finishSize, size - finishSize);
+            } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-            bytesRead += result; // 更新已读取字节数
         }
-//        System.out.println("byteRead end " + bytesRead);
-        return bytesRead;
     }
 }
