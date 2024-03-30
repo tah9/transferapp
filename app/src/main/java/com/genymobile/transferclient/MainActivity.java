@@ -1,30 +1,37 @@
 package com.genymobile.transferclient;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
 import android.graphics.SurfaceTexture;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.ParcelFileDescriptor;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.TextureView;
+import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.LinkedBlockingQueue;
 
-public class MainActivity extends AppCompatActivity implements TextureView.SurfaceTextureListener {
+public class MainActivity extends Activity implements TextureView.SurfaceTextureListener {
 
     private TextureView textureView;
 
@@ -32,10 +39,62 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Log.d(TAG, "onCreate: ");
+
+//        Intent intent = new Intent("");
+//        Process process;
+//        try {
+//            process = Runtime.getRuntime().exec("su");
+//            DataOutputStream outputStream = new DataOutputStream(process.getOutputStream());
+//
+//            // 运行 adb 命令直接打印屏幕信息
+//            outputStream.writeBytes("dumpsys window\n");
+//
+//            // 退出 root 权限
+//            outputStream.writeBytes("exit\n");
+//            outputStream.flush();
+//            process.waitFor();
+//
+//            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+//            StringBuilder output = new StringBuilder();
+//            String line;
+//            while ((line = reader.readLine()) != null) {
+//                output.append(line).append("\n");
+//            }
+//
+//            // 打印屏幕信息
+//            setTitle(output);
+//            System.out.println(output.toString());
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
+
+
+//        new Thread(()->{
+//
+//        try {
+//            Socket socket = new Socket("192.168.43.1", 5555);
+//            Log.d(TAG, "onCreate: ++++++++");
+//
+//            Socket socket2 = new Socket("192.168.43.248", 42663);
+//            Log.d(TAG, "onCreate: 2++++++++");
+//
+//
+//        } catch (IOException e) {
+//            Log.d(TAG, "onCreate: ---------");
+////            throw new RuntimeException(e);
+//        }  }).start();
+
+        WindowManager windowManager = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+        DisplayMetrics displayMetrics = new DisplayMetrics();
+        windowManager.getDefaultDisplay().getMetrics(displayMetrics);
+        Log.d(TAG, "onCreate: "+displayMetrics);
         textureView = new TextureView(this);
         textureView.setSurfaceTextureListener(this);
         setContentView(textureView);
     }
+
     private final LinkedBlockingQueue<MotionEvent> motionEvents = new LinkedBlockingQueue<>();
 
     private static final String TAG = "MainActivity";
@@ -46,13 +105,25 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
         Log.d(TAG, "onSurfaceTextureAvailable: ");
         new Thread(() -> {
             try {
-                ServerSocket serverSocket = new ServerSocket(20002);
+                int port = 20001;
+                ServerSocket serverSocket = new ServerSocket(port);
+                Log.d(TAG, "socket create finish " + port);
+
                 Socket videoSocket = serverSocket.accept();
                 Log.d(TAG, "onSurfaceTextureAvailable: videoSocket");
                 InputStream inputStream = videoSocket.getInputStream();
                 FileDescriptor fileDescriptor = ParcelFileDescriptor.fromSocket(videoSocket).getFileDescriptor();
 //                videoSocket.close();
-                VideoDecoder videoDecoder = new VideoDecoder(new Surface(surface), 1080, 2160, fileDescriptor, inputStream);
+
+                WindowManager windowManager = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+                DisplayMetrics displayMetrics = new DisplayMetrics();
+                windowManager.getDefaultDisplay().getMetrics(displayMetrics);
+                VideoDecoder videoDecoder = new VideoDecoder(new Surface(surface),
+//                        # 注意宽高要传入2的倍数
+//                        displayMetrics.widthPixels,
+//                        displayMetrics.heightPixels,
+                        1080,2326,
+                        fileDescriptor, inputStream);
                 Socket controlSocket = serverSocket.accept();
                 Log.d(TAG, "onSurfaceTextureAvailable: controlSocket");
 
