@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import com.genymobile.transferclient.config.PortConfig
 import com.genymobile.transferclient.home.compose.AppListContainer
+import com.genymobile.transferclient.home.compose.CapturePermission
 import com.genymobile.transferclient.home.compose.DeviceList
 import com.genymobile.transferclient.home.compose.FindNearDeviceButton
 import com.genymobile.transferclient.home.compose.InputConnection
@@ -106,12 +107,20 @@ class ActivityHome : ComponentActivity() {
         Column(
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 50.dp)
         ) {
+            CapturePermission()
+
             FindNearDeviceButton(
                 onClick = { /* 处理按钮点击 */ },
                 buttonText = "扫描附近的设备",
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             )
             InputConnection {
+                /*
+                连接逻辑：
+                主动连接的一方发送自己的设备信息，
+                然后读取被连接的一方设备信息。
+
+                 */
                 Log.d(TAG, "RootContainer:1 $it")
                 Thread {
                     Log.d(TAG, "RootContainer:2 $it")
@@ -130,6 +139,8 @@ class ActivityHome : ComponentActivity() {
 
                     val remoteDevice = objectInputStream.readObject() as Device
                     vm.mutableList.add(remoteDevice)
+
+
 
                 }.start()
             }

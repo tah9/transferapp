@@ -7,11 +7,17 @@ import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.genymobile.transferclient.home.data.Device
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 
 class MainVm : ViewModel() {
     val mutableList = mutableStateListOf<Device>()
-    var homeActiveIndex= mutableStateOf(1)
+    var homeActiveIndex = mutableStateOf(1)
 
     fun addItemToList(item: Device) {
         mutableList.add(item)
@@ -40,6 +46,10 @@ class MainVm : ViewModel() {
         return Device(model, deviceName, width, height, dpi)
 
     }
+
+    private val scope = viewModelScope
+
+
 
     private val TAG = "MainVm"
 }

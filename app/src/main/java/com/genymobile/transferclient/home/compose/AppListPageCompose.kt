@@ -8,6 +8,7 @@ import android.graphics.drawable.Drawable
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +18,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,6 +38,15 @@ import com.genymobile.transferclient.home.MainVm
 import com.genymobile.transferclient.home.data.ApplicationInfo
 import com.genymobile.transferclient.home.data.Device
 import com.genymobile.transferclient.tools.Utils
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.invoke
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.CoroutineContext
 
 private const val TAG = "AppListPageCompose"
 
@@ -40,40 +55,66 @@ fun AppListContainer(context: Activity, vm: MainVm, onClick: (ApplicationInfo) -
     Column {
         DevicesContainer(context, vm)
 
-        val applicationInfos = mutableListOf<ApplicationInfo>()
+        var sortedAppInfos by remember { mutableStateOf(emptyList<ApplicationInfo>()) }
+        var appsByFirstLetter by remember { mutableStateOf(emptyMap<Char, List<ApplicationInfo>>()) }
+
+        LaunchedEffect(Unit) {
+            coroutineScope {
+                val deferredAppInfos = async(Dispatchers.IO) {
+                    val packageInfos = context.getPackageManager().getInstalledPackages(0)
+                    val packageManager = context.packageManager
+
+                    val applicationInfos = mutableListOf<ApplicationInfo>()
+                    packageInfos.forEach { packageInfo ->
+                        if (packageManager.getLaunchIntentForPackage(packageInfo.packageName) != null) {
+                            val appName = packageInfo.applicationInfo.loadLabel(packageManager).toString()
+                            val appIcon = packageInfo.applicationInfo.loadIcon(packageManager)
+                            val packageName = packageInfo.packageName
+
+                            val appInfo = withContext(Dispatchers.Main) {
+                                // 将从Drawable转换为Base64的操作放在主线程，因为有些转换方法可能要求在UI线程中执行
+                                ApplicationInfo(
+                                    appName,
+                                    // 注意：Utils.drawableToBase64 应该能处理null情况，这里假设它已经处理了
+                                    Utils.drawableToBase64(context, appIcon)!!,
+                                    packageName
+                                )
+                            }
+                            applicationInfos.add(appInfo)
+                        }
+                    }
+
+                    // 排序和分组也在IO调度器上完成，但分组键的获取要在主线程，因为它涉及到字符串访问
+                    val sorted = applicationInfos.sortedBy { it.name }
+                    val grouped = withContext(Dispatchers.Main) {
+                        sorted.groupBy { it.name.firstOrNull() ?: '_' }
+                    }
+                    grouped to sorted
+                }
+
+                // 获取异步操作的结果并在主线程中更新状态
+                val (groupedApps, sortedApps) = deferredAppInfos.await()
+                appsByFirstLetter = groupedApps
+                sortedAppInfos = sortedApps
 
 
-        var packageInfos = context.getPackageManager().getInstalledPackages(0);
-        val packageManager = context.packageManager
-// 创建一个可变列表来保存ApplicationInfo实体对象，并按名称排序
-        packageInfos.forEach { packageInfo ->
-
-            if (packageManager.getLaunchIntentForPackage(packageInfo.packageName) != null) {
-                val appName =
-                    packageInfo.applicationInfo.loadLabel(packageManager).toString()
-                val appIcon = packageInfo.applicationInfo.loadIcon(packageManager)
-                val packageName = packageInfo.packageName
-
-                // 创建一个ApplicationInfo实例并将它添加到列表中
-                val appInfo =
-                    ApplicationInfo(
-                        appName,
-                        Utils.drawableToBase64(context, appIcon)!!,
-                        packageName
-                    )
-                applicationInfos.add(appInfo)
             }
         }
-
-// 对应用名按字母顺序进行排序
-        val sortedAppInfos = applicationInfos.sortedBy { it.name }
-
-// 如果需要按首字母分组，可以进一步处理sortedAppInfos，例如：
-        val appsByFirstLetter: Map<Char, List<ApplicationInfo>> =
-            sortedAppInfos.groupBy { it.name.firstOrNull() ?: '_' }
-
-        ShowAddressBookView(appsByFirstLetter, onClick)
+        ShowAddressBookView(
+            appsByFirstLetter,
+            onClick
+        )
     }
+
+    val startTime = System.currentTimeMillis()
+
+
+    val endTime = System.currentTimeMillis()
+
+    val elapsedTime = endTime - startTime
+
+    Log.d(TAG, "AppListContainer: 代码执行时间：$elapsedTime 毫秒")
+
 }
 
 

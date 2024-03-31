@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -45,7 +46,10 @@ import kotlinx.coroutines.launch
 private const val TAG = "TestLetterIndex"
 
 @Composable
-fun ShowAddressBookView(data: Map<Char, List<ApplicationInfo>>,onClick:(ApplicationInfo)->Unit) {
+fun ShowAddressBookView(
+    data: Map<Char, List<ApplicationInfo>>,
+    onClick: (ApplicationInfo) -> Unit
+) {
     AddressBookView(
         data = data,
         modifier = Modifier
@@ -59,7 +63,7 @@ fun ShowAddressBookView(data: Map<Char, List<ApplicationInfo>>,onClick:(Applicat
 //                    .background(Color.Red)
 //                    .height(30.dp)
                     .clickable {
-                               onClick(it)
+                        onClick(it)
                     },
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
@@ -122,13 +126,13 @@ fun <T> AddressBookView(
 
                 }
             }*/
-            data.forEach { initial, listData ->
+            data.forEach { char, listData ->
                 item {
                     Column {
 //                        stickyHeader(contentType = initial) {
 //                            contentTitle(initial)
 //                        }
-                        contentTitle(initial)
+                        contentTitle(char)
                         LazyRow(
                             content = {
                                 items(listData) {
@@ -141,7 +145,7 @@ fun <T> AddressBookView(
                 }
             }
             //尾部占位
-            item{
+            item {
                 Box(Modifier.height(80.dp)) {
 
                 }
@@ -157,7 +161,7 @@ fun <T> AddressBookView(
                 .padding(bottom = 60.dp)
 //                .width(15.dp)
 //                .fillMaxHeight()
-                ,
+            ,
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
