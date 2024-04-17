@@ -1,14 +1,8 @@
-package com.genymobile.transferclient.home.compose
+package com.genymobile.transferclient.home.compose.transfer
 
 import android.app.Activity
-import android.content.Intent
-import android.content.pm.PackageInfo
-import android.content.pm.PackageManager
-import android.graphics.drawable.Drawable
-import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,30 +26,22 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import com.genymobile.transferclient.R
 import com.genymobile.transferclient.home.MainVm
 import com.genymobile.transferclient.home.data.ApplicationInfo
 import com.genymobile.transferclient.home.data.Device
-import com.genymobile.transferclient.tools.Utils
-import kotlinx.coroutines.CoroutineScope
+import com.genymobile.transferclient.tools.Utils.compressToBase64
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.invoke
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlin.coroutines.CoroutineContext
+import net.sourceforge.pinyin4j.PinyinHelper
 
 private const val TAG = "AppListPageCompose"
 
 @Composable
 fun AppListContainer(context: Activity, vm: MainVm, onClick: (ApplicationInfo) -> Unit) {
     Column {
-        DevicesContainer(context, vm)
 
-        var sortedAppInfos by remember { mutableStateOf(emptyList<ApplicationInfo>()) }
         var appsByFirstLetter by remember { mutableStateOf(emptyMap<Char, List<ApplicationInfo>>()) }
 
         LaunchedEffect(Unit) {
@@ -67,53 +53,50 @@ fun AppListContainer(context: Activity, vm: MainVm, onClick: (ApplicationInfo) -
                     val applicationInfos = mutableListOf<ApplicationInfo>()
                     packageInfos.forEach { packageInfo ->
                         if (packageManager.getLaunchIntentForPackage(packageInfo.packageName) != null) {
-                            val appName = packageInfo.applicationInfo.loadLabel(packageManager).toString()
+                            val appName =
+                                packageInfo.applicationInfo.loadLabel(packageManager).toString()
                             val appIcon = packageInfo.applicationInfo.loadIcon(packageManager)
                             val packageName = packageInfo.packageName
+                            val compressToBase64 = appIcon.compressToBase64(64, 64)!!
 
-                            val appInfo = withContext(Dispatchers.Main) {
-                                // 将从Drawable转换为Base64的操作放在主线程，因为有些转换方法可能要求在UI线程中执行
+//                            Log.d(TAG, "AppListContainer: $compressToBase64")
+                            val appInfo =
                                 ApplicationInfo(
                                     appName,
-                                    // 注意：Utils.drawableToBase64 应该能处理null情况，这里假设它已经处理了
-                                    Utils.drawableToBase64(context, appIcon)!!,
-                                    packageName
+                                    compressToBase64,
+                                    packageName,
+                                    if (Character.toString(appName.get(0))
+                                            .matches(Regex("[\\u4E00-\\u9FA5]+"))
+                                    ) {
+                                        PinyinHelper.toHanyuPinyinStringArray(appName.get(0)).get(0)
+                                            .get(0)
+                                            .uppercaseChar()
+                                    } else {
+                                        appName.firstOrNull()?.uppercaseChar() ?: '_'
+                                    }
                                 )
-                            }
+//                            }
                             applicationInfos.add(appInfo)
                         }
                     }
 
                     // 排序和分组也在IO调度器上完成，但分组键的获取要在主线程，因为它涉及到字符串访问
-                    val sorted = applicationInfos.sortedBy { it.name }
-                    val grouped = withContext(Dispatchers.Main) {
-                        sorted.groupBy { it.name.firstOrNull() ?: '_' }
-                    }
-                    grouped to sorted
+                    val sorted = applicationInfos.sortedBy { it.pin }
+                    sorted.groupBy { it.pin }
                 }
 
                 // 获取异步操作的结果并在主线程中更新状态
-                val (groupedApps, sortedApps) = deferredAppInfos.await()
+                val groupedApps = deferredAppInfos.await()
+
                 appsByFirstLetter = groupedApps
-                sortedAppInfos = sortedApps
-
-
             }
         }
+
         ShowAddressBookView(
             appsByFirstLetter,
             onClick
         )
     }
-
-    val startTime = System.currentTimeMillis()
-
-
-    val endTime = System.currentTimeMillis()
-
-    val elapsedTime = endTime - startTime
-
-    Log.d(TAG, "AppListContainer: 代码执行时间：$elapsedTime 毫秒")
 
 }
 
@@ -121,7 +104,7 @@ fun AppListContainer(context: Activity, vm: MainVm, onClick: (ApplicationInfo) -
 @Composable
 fun DevicesContainer(context: Activity, vm: MainVm) {
     val localDevice = vm.createDevice(context)
-    Row(
+    Column(
 //        horizontalArrangement = Arrangement.Center,
         modifier = Modifier
             .background(color = Color(0xfff2f6fe))

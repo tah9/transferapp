@@ -1,6 +1,5 @@
-package com.genymobile.transferclient.home.compose
+package com.genymobile.transferclient.home.compose.transfer
 
-import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -8,8 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,12 +18,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Divider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -108,7 +103,7 @@ fun <T> AddressBookView(
     contentBody: @Composable (item: T) -> Unit,
     contentTitle: @Composable (item: Char) -> Unit,
 ) {
-    val charList = getCharList()
+    val charList = data.keys
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val layoutInfo by remember { derivedStateOf { listState.layoutInfo } }
@@ -121,11 +116,8 @@ fun <T> AddressBookView(
             modifier = Modifier.fillMaxWidth(),
             state = listState,
         ) {
-            /*item{
-                Box(Modifier.height(80.dp)) {
 
-                }
-            }*/
+
             data.forEach { char, listData ->
                 item {
                     Column {
@@ -170,34 +162,17 @@ fun <T> AddressBookView(
                 val color = Color.Green
                 Box(
                     modifier = Modifier
-                        .size(15.dp)
 //                        .background(color)
                         .clickable {
-                            if (char == 35.toChar()) {
-                                coroutineScope.launch {
-                                    listState.animateScrollToItem(0)
-                                }
-                            } else {
-                                var index = 0
-                                for (typeList in charList) {
-                                    if (typeList == char) {
-                                        coroutineScope.launch {
-                                            listState.animateScrollToItem(index)
-                                        }
-                                        break
-                                    } else {
-                                        val size = data[typeList]?.size ?: 0
-                                        index += size + 1
-                                    }
-                                }
+                            coroutineScope.launch {
+                                listState.animateScrollToItem(charList.indexOf(char))
                             }
-
                         }
                 ) {
                     Text(
                         text = char.toString(),
                         color = Color.Black,
-                        fontSize = 10.sp,
+                        fontSize = 15.sp,
                         modifier = Modifier.align(
                             Alignment.Center
                         )
@@ -214,16 +189,5 @@ fun <T> AddressBookView(
     }
 }
 
-//获取字母列表
-private fun getCharList(): List<Char> {
-    val charList = mutableListOf<Char>()
-    val char = 35
-    charList.add(char.toChar())
-    (65..90).forEach { letter ->
-        charList.add(letter.toChar())
-    }
-    return charList
-}
-//获取数据
 
 

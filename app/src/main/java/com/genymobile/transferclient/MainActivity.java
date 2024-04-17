@@ -2,12 +2,10 @@ package com.genymobile.transferclient;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.content.Context;
-import android.content.Intent;
 import android.graphics.SurfaceTexture;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.ParcelFileDescriptor;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -18,11 +16,14 @@ import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
+
+import com.genymobile.transferclient.tools.FileUtils;
+import com.genymobile.transferclient.tools.RunProcess;
 
 import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,23 +35,58 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class MainActivity extends Activity implements TextureView.SurfaceTextureListener {
 
     private TextureView textureView;
-
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Log.d(TAG, "onCreate: ");
 
-//        Intent intent = new Intent("");
+
+
+
+        new Thread(()->{
+            String targetJarFileName = "transfer.jar";
+            FileUtils.copyAssetsFileToAdbPath(this, "finish.dex", targetJarFileName);
+            try {
+
+                String path = getFilesDir().getAbsolutePath() + "/" + targetJarFileName;
+
+                String terminal = "CLASSPATH=" + path + " app_process / com.genymobile.transfer.Server ";
+
+                String suTerminal = "su -c " + terminal;
+                Log.d(TAG, "onCreate: suTerminal=" + suTerminal);
+//                Process process = Runtime.getRuntime().exec(suTerminal);
+                String result = RunProcess.runProcess("su -c cmd package resolve-activity --brief -c android.intent.category.LAUNCHER bin.mt.plus");
+
+                Log.d(TAG, "onCreate: finish process");
+                Log.d(TAG, "result="+result);
+
+                //息屏代码
+//            Process process = Runtime.getRuntime().exec("su -c input keyevent KEYCODE_POWER");
+
+
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
+
+
+
 //        Process process;
 //        try {
 //            process = Runtime.getRuntime().exec("su");
 //            DataOutputStream outputStream = new DataOutputStream(process.getOutputStream());
 //
 //            // 运行 adb 命令直接打印屏幕信息
-//            outputStream.writeBytes("dumpsys window\n");
+////            outputStream.writeBytes("dumpsys window\n");
+//
+//            String terminal = "CLASSPATH=/data/data/com.genymobile.transferclient/files/transfer.bak app_process / com.genymobile.transfer.Server";
+//            Log.d(TAG, "onCreate: "+terminal);
+////            outputStream.writeBytes("export CLASSPATH=/data/data/com.genymobile.transferclient/files/transfer.bak");
+////            outputStream.writeBytes("export CLASSPATH=/data/data/com.genymobile.transferclient/files/transfer.bak;exec app_process /system/bin/ com.genymobile.transfer.Server");
+//            outputStream.writeBytes(terminal);
 //
 //            // 退出 root 权限
-//            outputStream.writeBytes("exit\n");
+////            outputStream.writeBytes("exit\n");
 //            outputStream.flush();
 //            process.waitFor();
 //
@@ -89,7 +125,7 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         WindowManager windowManager = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
         DisplayMetrics displayMetrics = new DisplayMetrics();
         windowManager.getDefaultDisplay().getMetrics(displayMetrics);
-        Log.d(TAG, "onCreate: "+displayMetrics);
+        Log.d(TAG, "onCreate: " + displayMetrics);
         textureView = new TextureView(this);
         textureView.setSurfaceTextureListener(this);
         setContentView(textureView);
@@ -122,7 +158,7 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
 //                        # 注意宽高要传入2的倍数
 //                        displayMetrics.widthPixels,
 //                        displayMetrics.heightPixels,
-                        1080,2326,
+                        1080, 2326,
                         fileDescriptor, inputStream);
                 Socket controlSocket = serverSocket.accept();
                 Log.d(TAG, "onSurfaceTextureAvailable: controlSocket");

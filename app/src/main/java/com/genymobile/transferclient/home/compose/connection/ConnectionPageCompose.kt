@@ -1,4 +1,4 @@
-package com.genymobile.transferclient.home.compose
+package com.genymobile.transferclient.home.compose.connection
 
 import android.util.Log
 import androidx.compose.foundation.background
@@ -24,12 +24,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Alignment.Companion.CenterVertically
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,31 +53,50 @@ fun TabView(vm: MainVm, modifier: Modifier, onClick: () -> Unit) {
     )
     Row(
         horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = CenterVertically,
         modifier = finalModifier
     ) {
-        TabItem(text = "互联", active = vm.homeActiveIndex.value == 0) {
-            vm.homeActiveIndex.value = 0
-            onClick()
-        }
-        TabItem(text = "流转", active = vm.homeActiveIndex.value == 1) {
-            vm.homeActiveIndex.value = 1
-            onClick()
-        }
-        TabItem(text = "互传", active = vm.homeActiveIndex.value == 2) {
-            vm.homeActiveIndex.value = 2
-            onClick()
-        }
+        val mo= Modifier
+            .weight(1f)
+            .fillMaxWidth()
+        TabItem(
+            text = "互联",
+            active = vm.homeActiveIndex.value == 0,
+            onClick = {
+                vm.homeActiveIndex.value = 0
+                onClick()
+            },
+            modifier = mo
+        )
+        TabItem(
+            text = "流转",
+            active = vm.homeActiveIndex.value == 1,
+            onClick = {
+                vm.homeActiveIndex.value = 1
+                onClick()
+            },
+            modifier = mo
+        )
+        TabItem(
+            text = "互传",
+            active = vm.homeActiveIndex.value == 2,
+            onClick = {
+                vm.homeActiveIndex.value = 2
+                onClick()
+            },
+            modifier = mo
+        )
     }
 }
 
 @Composable
-fun TabItem(text: String, active: Boolean, onClick: () -> Unit) {
+fun TabItem(text: String, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Text(
         text = text,
         color = if (active) Color.Black else Color.Gray,
         fontSize = if (active) 18.sp else 14.sp,
-        modifier = Modifier.clickable(onClick = onClick)
+        textAlign = TextAlign.Center,
+        modifier = modifier.clickable(onClick = onClick)
     )
 }
 
@@ -87,7 +107,7 @@ fun FindNearDeviceButton(
     buttonText: String
 ) {
     Row(
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = CenterVertically,
         modifier = Modifier
             .padding(top = 16.dp)
             .height(20.dp)
@@ -124,7 +144,7 @@ fun InputConnection(onClick: (String) -> Unit) {
         Box(
             Modifier
                 .weight(1f)
-                .align(Alignment.CenterVertically)
+                .align(CenterVertically)
         ) {
             if (text.isEmpty()) {
                 Text(

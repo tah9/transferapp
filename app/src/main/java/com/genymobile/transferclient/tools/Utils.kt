@@ -76,6 +76,43 @@ object Utils {
         }
     }
 
+
+    fun Drawable.compressToBase64(maxWidth: Int, maxHeight: Int): String? {
+        // 创建一个新的Bitmap来绘制Drawable
+        val bitmap = Bitmap.createBitmap(if (intrinsicWidth > 0) intrinsicWidth else 1,
+            if (intrinsicHeight > 0) intrinsicHeight else 1,
+            Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        setBounds(0, 0, canvas.width, canvas.height)
+        draw(canvas)
+
+        // 压缩Bitmap
+        val resizedBitmap = compressBitmap(bitmap, maxWidth, maxHeight)
+
+        // 将Bitmap转换为Base64字符串
+        return bitmapToBase64(resizedBitmap)
+    }
+
+     fun compressBitmap(bitmap: Bitmap, maxWidth: Int, maxHeight: Int): Bitmap {
+        val originalWidth = bitmap.width
+        val originalHeight = bitmap.height
+        val scale = Math.min(maxWidth.toFloat() / originalWidth, maxHeight.toFloat() / originalHeight)
+
+        val newWidth = (originalWidth * scale).toInt()
+        val newHeight = (originalHeight * scale).toInt()
+
+        val resizedBitmap = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+        return resizedBitmap
+    }
+
+     fun bitmapToBase64(bitmap: Bitmap): String {
+        val outputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100 /* quality */, outputStream)
+        val byteArray = outputStream.toByteArray()
+
+        return Base64.encodeToString(byteArray, Base64.DEFAULT)
+    }
+
 }
 // 调用示例
 // val base64String = drawableToBase64(context, R.drawable.your_drawable)
