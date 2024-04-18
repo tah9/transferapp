@@ -3,12 +3,12 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <queries >
+    <queries>
         <intent>
-            <action android:name="android.media.action.IMAGE_CAPTURE"/>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
         </intent>
         <intent>
-            <action android:name="android.media.action.ACTION_VIDEO_CAPTURE"/>
+            <action android:name="android.media.action.ACTION_VIDEO_CAPTURE" />
         </intent>
 
         <intent>
@@ -17,6 +17,7 @@
         </intent>
     </queries>
     <application
+        android:name=".CustomContext"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -28,7 +29,7 @@
         tools:targetApi="31">
         <activity
             android:name=".MainActivity"
-            android:exported="true" >
+            android:exported="true">
 
         </activity>
         <activity

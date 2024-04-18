@@ -21,6 +21,7 @@ object FileUtils{
 
             // 创建目标目录（如果不存在）
             val targetDirectory = File(context.getFilesDir().absolutePath)
+//            val targetDirectory = File("/data/local/tmp")
             if (!targetDirectory.exists()) {
                 targetDirectory.mkdirs()
             }

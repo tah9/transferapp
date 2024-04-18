@@ -118,11 +118,12 @@ fun DeviceList(vm: MainVm, onClick: () -> Unit) {
 
     LazyColumn(
         modifier = Modifier
-            .clip(RoundedCornerShape(14.dp))
             .fillMaxSize()
             .padding(bottom = 10.dp)
+            .clip(RoundedCornerShape(14.dp))
             .background(Color(0xffebeaf3))
             .padding(10.dp)
+
     ) {
         items(vm.devicesList.size) { index ->
             val item = vm.devicesList[index]
