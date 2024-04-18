@@ -1,5 +1,6 @@
 package com.genymobile.transferclient.home.compose.connection
 
+import android.util.Log
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -22,6 +23,8 @@ fun ConnectionContainer(vm: MainVm) {
         InputConnection {
             vm.initiativeSocket(it)
         }
-        DeviceList(vm)
+        DeviceList(vm) {
+            Log.d("TAG", "DeviceList: click")
+        }
     }
 }

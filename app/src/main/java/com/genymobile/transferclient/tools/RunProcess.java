@@ -17,11 +17,11 @@ public class RunProcess {
     }
 
     public static void runProcessAsync(String terminal) throws Exception {
+        Process process = Runtime.getRuntime().exec(terminal);
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    Process process = Runtime.getRuntime().exec(terminal);
                     BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
                     String line;
                     while ((line = reader.readLine()) != null) {

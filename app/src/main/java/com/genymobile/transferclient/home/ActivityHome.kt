@@ -22,11 +22,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import com.example.myapplication.ui.theme.MyApplicationTheme
+import com.genymobile.transferclient.home.compose.TabView
 import com.genymobile.transferclient.home.compose.transfer.AppListContainer
 import com.genymobile.transferclient.home.compose.transfer.DevicesContainer
-import com.genymobile.transferclient.home.compose.connection.TabView
 import com.genymobile.transferclient.home.compose.connection.ConnectionContainer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 
 class ActivityHome : ComponentActivity() {
@@ -50,33 +53,21 @@ class ActivityHome : ComponentActivity() {
                         if (vm.homeActiveIndex.value == 0) {
                             ConnectionContainer(vm)
                         } else if (vm.homeActiveIndex.value == 1) {
+                            var packageName by remember { mutableStateOf<String?>(null) }
                             var showDialog by remember { mutableStateOf(false) }
                             AppListContainer(context, vm, onClick = {
-//                                Log.e("test", "ShowAddressBookView:${it.name} ")
+                                packageName = it.packageName
                                 showDialog = true
-
-//                                //当点击的时候会将
-//                                val packageManager = context.packageManager
-//                                val intent =
-//                                    packageManager.getLaunchIntentForPackage(it.packageName)
-//                                intent?.let {
-//                                    context.startActivity(it)
-//                                }
-
                             })
                             if (showDialog) {
                                 AlertDialog(
                                     onDismissRequest = { showDialog = false },
-                                    title = { Text("选择目标设备") },
+                                    title = { Text("选择接力设备") },
                                     text = {
-                                        DevicesContainer(context, vm)
-
-//                                        val listItems = listOf("Item 1", "Item 2", "Item 3", "Item 4")
-//                                        LazyColumn {
-//                                            items(listItems) { item ->
-//                                                Text(text = item)
-//                                            }
-//                                        }
+                                        DevicesContainer(context, vm) {
+                                            Log.d(TAG, "onCreate: $packageName")
+                                            vm.appRelay(packageName!!, it)
+                                        }
                                     },
                                     confirmButton = {},
                                     dismissButton = {
@@ -96,7 +87,7 @@ class ActivityHome : ComponentActivity() {
                                 .height(50.dp)
                                 .align(Alignment.BottomCenter),
                             onClick = {
-                                Log.d(TAG, "onCreate: ${vm.homeActiveIndex}")
+//                                Log.d(TAG, "onCreate: ${vm.homeActiveIndex}")
                             }
                         )
                     }

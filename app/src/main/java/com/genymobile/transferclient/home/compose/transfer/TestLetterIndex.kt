@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,22 +30,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.genymobile.transferclient.home.data.ApplicationInfo
-import com.genymobile.transferclient.tools.Utils
+import com.google.accompanist.drawablepainter.rememberDrawablePainter
+import com.google.android.material.internal.FlowLayout
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 
 private const val TAG = "TestLetterIndex"
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ShowAddressBookView(
     data: Map<Char, List<ApplicationInfo>>,
     onClick: (ApplicationInfo) -> Unit
 ) {
+
     AddressBookView(
         data = data,
         modifier = Modifier
@@ -63,17 +67,12 @@ fun ShowAddressBookView(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-
-                val imageBitmap: ImageBitmap? =
-                    Utils.decodeBase64ToBitmap(it.icon)
-                if (imageBitmap != null) {
-                    Image(
-                        bitmap = imageBitmap,
-                        contentDescription = null, // 添加图片描述
-                        modifier = Modifier.size(45.dp), // 设置图片大小
-                        contentScale = ContentScale.Crop // 设置图片裁剪方式
-                    )
-                }
+                Image(
+                    painter = rememberDrawablePainter(it.icon),
+                    contentDescription = null, // 添加图片描述
+                    modifier = Modifier.size(45.dp), // 设置图片大小
+                    contentScale = ContentScale.Crop // 设置图片裁剪方式
+                )
                 Text(
                     text = it.name,
                     color = Color.Black,
@@ -90,17 +89,18 @@ fun ShowAddressBookView(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(20.dp)
+                    .padding(start = 10.dp)
             )
         })
 }
 
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
-fun <T> AddressBookView(
-    data: Map<Char, List<T>>,
+fun AddressBookView(
+    data: Map<Char, List<ApplicationInfo>>,
     modifier: Modifier = Modifier,
-    contentBody: @Composable (item: T) -> Unit,
+    contentBody: @Composable (item: ApplicationInfo) -> Unit,
     contentTitle: @Composable (item: Char) -> Unit,
 ) {
     val charList = data.keys
@@ -116,24 +116,16 @@ fun <T> AddressBookView(
             modifier = Modifier.fillMaxWidth(),
             state = listState,
         ) {
-
-
             data.forEach { char, listData ->
-                item {
+                item(key = char) {
                     Column {
-//                        stickyHeader(contentType = initial) {
-//                            contentTitle(initial)
-//                        }
                         contentTitle(char)
-                        LazyRow(
-                            content = {
-                                items(listData) {
-                                    contentBody(it)
-                                }
+                        FlowRow {
+                            listData.forEach { item ->
+                                contentBody(item)
                             }
-                        )
+                        }
                     }
-
                 }
             }
             //尾部占位
@@ -178,14 +170,8 @@ fun <T> AddressBookView(
                         )
                     )
                 }
-
             }
         }
-    }
-
-    if (listState.isScrollInProgress) {
-//            val layoutInfo by remember { derivedStateOf { listState.layoutInfo } }
-//            isSelectType = layoutInfo.visibleItemsInfo.first().contentType as Char
     }
 }
 

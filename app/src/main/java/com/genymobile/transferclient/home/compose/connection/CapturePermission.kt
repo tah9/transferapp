@@ -17,7 +17,7 @@ fun CapturePermission(vm: MainVm) {
     if (vm.kernelRunning.value) {
         str = "核心服务已启动"
     } else {
-        str = "核心未启,请通过adb运行以下命令:\n"
+        str = "核心未启动"
     }
     Text(text = str, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
 }

@@ -1,18 +1,19 @@
 package com.genymobile.transferclient.home.compose.connection
 
 import android.util.Log
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Button
@@ -26,79 +27,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Alignment.Companion.CenterVertically
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.genymobile.transferclient.R
 import com.genymobile.transferclient.home.MainVm
 
-@Composable
-fun TabView(vm: MainVm, modifier: Modifier, onClick: () -> Unit) {
-    val finalModifier = modifier.then(
-        modifier.drawWithContent {
-            drawContent()
-            drawLine(
-                start = Offset(0f, 0f),
-                end = Offset(size.width, 0f),
-                color = Color.Black,
-                strokeWidth = 1f,
-                cap = StrokeCap.Square,
-                alpha = 0.8f
-            )
-        }
-    )
-    Row(
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = CenterVertically,
-        modifier = finalModifier
-    ) {
-        val mo= Modifier
-            .weight(1f)
-            .fillMaxWidth()
-        TabItem(
-            text = "互联",
-            active = vm.homeActiveIndex.value == 0,
-            onClick = {
-                vm.homeActiveIndex.value = 0
-                onClick()
-            },
-            modifier = mo
-        )
-        TabItem(
-            text = "流转",
-            active = vm.homeActiveIndex.value == 1,
-            onClick = {
-                vm.homeActiveIndex.value = 1
-                onClick()
-            },
-            modifier = mo
-        )
-        TabItem(
-            text = "互传",
-            active = vm.homeActiveIndex.value == 2,
-            onClick = {
-                vm.homeActiveIndex.value = 2
-                onClick()
-            },
-            modifier = mo
-        )
-    }
-}
-
-@Composable
-fun TabItem(text: String, active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        color = if (active) Color.Black else Color.Gray,
-        fontSize = if (active) 18.sp else 14.sp,
-        textAlign = TextAlign.Center,
-        modifier = modifier.clickable(onClick = onClick)
-    )
-}
 
 @Composable
 fun FindNearDeviceButton(
@@ -131,7 +70,7 @@ fun FindNearDeviceButton(
 
 @Composable
 fun InputConnection(onClick: (String) -> Unit) {
-    var text by remember { mutableStateOf("10.0.2.2") }
+    var text by remember { mutableStateOf("192.168.43.1") }
 
     Row(
         modifier = Modifier
@@ -175,29 +114,53 @@ fun InputConnection(onClick: (String) -> Unit) {
 }
 
 @Composable
-fun DeviceList(vm: MainVm) {
-    LazyVerticalGrid(GridCells.Adaptive(100.dp)) {
-        items(vm.mutableList.size) { index ->
-            val item = vm.mutableList[index]
-            // 在这里放置每个项目的内容，这里只是一个示例
-            Column(
-                verticalArrangement = Arrangement.Center,
+fun DeviceList(vm: MainVm, onClick: () -> Unit) {
+
+    LazyColumn(
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .fillMaxSize()
+            .padding(bottom = 10.dp)
+            .background(Color(0xffebeaf3))
+            .padding(10.dp)
+    ) {
+        items(vm.devicesList.size) { index ->
+            val item = vm.devicesList[index]
+            val imagePainter: Painter = painterResource(id = R.drawable.phone)
+
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(80.dp)
+                    .height(110.dp)
                     .padding(vertical = 8.dp)
-                    .background(color = Color.Cyan, shape = RoundedCornerShape(16.dp))
-                    .padding(8.dp),
-                content = {
-                    Text(text = item.name)
-                    Text(
-                        text = item.model,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Log.d(TAG, "DeviceList: " + vm.mutableList.size)
-                }
-            )
+                    .background(color = Color.White, shape = RoundedCornerShape(16.dp))
+            ) {
+                Image(
+                    painter = imagePainter,
+                    contentDescription = "SVG Image",
+                    modifier = Modifier
+                        .size(60.dp)
+                        .align(Alignment.CenterVertically)
+                        .padding(end = 10.dp, start = 15.dp)
+                        .background(/*Color(0xff495d92)*/Color.Transparent)
+                        .padding(vertical = 5.dp),
+                    contentScale = ContentScale.Fit,
+//            colorFilter = ColorFilter.tint(Color.Red) // 如果需要对SVG进行着色，可以添加colorFilter
+                )
+                Column(
+                    modifier = Modifier.align(CenterVertically),
+                    verticalArrangement = Arrangement.Center,
+                    content = {
+                        Text(text = item.model, fontSize = 20.sp)
+                        Text(
+                            text = item.name,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Log.d(TAG, "DeviceList: " + vm.devicesList.size)
+                    }
+                )
+            }
         }
     }
 }
