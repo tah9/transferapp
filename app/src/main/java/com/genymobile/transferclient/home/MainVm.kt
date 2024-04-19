@@ -1,6 +1,7 @@
 package com.genymobile.transferclient.home
 
 import android.app.Activity
+import android.bluetooth.BluetoothAdapter
 import android.content.Intent
 import android.graphics.Point
 import android.os.Build
@@ -15,6 +16,7 @@ import com.genymobile.transferclient.MainActivity
 import com.genymobile.transferclient.config.PortConfig
 import com.genymobile.transferclient.home.data.ApplicationInfo
 import com.genymobile.transferclient.home.data.Device
+import com.genymobile.transferclient.home.data.DownloadHistory
 import com.genymobile.transferclient.tools.FileUtils
 import com.genymobile.transferclient.tools.RunProcess
 import kotlinx.coroutines.Dispatchers
@@ -49,9 +51,11 @@ class MainVm(val mContext: Activity) : ViewModel() {
         val dataInputStream = DataInputStream(inputStream)
     }
 
+    var listHistory = mutableStateListOf<DownloadHistory>()
+
     val devicesList = mutableStateListOf<Device>()
     val socketList = mutableStateListOf<CustomSocket>()
-    var homeActiveIndex = mutableStateOf(0)
+    var homeActiveIndex = mutableStateOf(2)
     val kernelRunning = mutableStateOf(false)
 
     var transferService: ITransferInterface? = null
@@ -90,6 +94,10 @@ class MainVm(val mContext: Activity) : ViewModel() {
                         .putExtra("host", host)
                         .putExtra("dynamicPort", dynamicPort)
                     mContext.startActivity(intent)
+                }
+                //接受文件
+                if (messageType==MessageType.FILE){
+
                 }
             }
 

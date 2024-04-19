@@ -34,7 +34,7 @@ private const val TAG = "AppListPageCompose"
 fun AppListContainer(context: Activity, vm: MainVm, onClick: (ApplicationInfo) -> Unit) {
     Column {
 
-        ShowAddressBookView(
+        AppListContainer(
             vm.appsByFirstLetter.value,
             onClick
         )

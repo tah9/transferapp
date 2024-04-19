@@ -50,12 +50,10 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
 
         ScreenUtil.changeFullScreen(this, true);
 
-//        setContentView(R.layout.activity_main);
 
-
-//        textureView = new TextureView(this);
-//        textureView.setSurfaceTextureListener(this);
-//        setContentView(textureView);
+        textureView = new TextureView(this);
+        textureView.setSurfaceTextureListener(this);
+        setContentView(textureView);
 
 
     }
@@ -86,44 +84,45 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
                 VideoDecoder videoDecoder = new VideoDecoder(new Surface(surface),
                         displayMetrics.widthPixels % 2 != 0 ? displayMetrics.widthPixels - 1 : displayMetrics.widthPixels,
                         displayMetrics.heightPixels % 2 != 0 ? displayMetrics.heightPixels - 1 : displayMetrics.heightPixels,
-//                        1080, 2326,
                         fileDescriptor, inputStream);
-//                Socket controlSocket = serverSocket.accept();
-//                Log.d(TAG, "onSurfaceTextureAvailable: controlSocket");
-//
-//                DataOutputStream oos = new DataOutputStream(controlSocket.getOutputStream());
-//                DataInputStream ois = new DataInputStream(controlSocket.getInputStream());
-//                textureView.setOnTouchListener((v, event) -> {
-//                    motionEvents.offer(event);
-//                    return true;
-//                });
-//                new Thread(() -> {
-//                    while (true) {
-//                        try {
-//                            MotionEvent event = motionEvents.take();
-//                            try {
-//                                oos.writeInt((int) (event.getDownTime()));
-//                                oos.writeInt(event.getAction());
-//                                oos.writeInt(event.getPointerCount());
-//
-//                                for (int i = 0; i < event.getPointerCount(); i++) {
-//                                    oos.writeInt(event.getPointerId(i));
-//                                    oos.writeInt((int) event.getX(i));
-//                                    oos.writeInt((int) event.getY(i));
-//                                    oos.writeFloat(event.getPressure(i));
-//                                }
-//                                oos.writeInt(event.getButtonState());
-//                                oos.writeInt(event.getSource());
-//                                oos.flush();
-//                            } catch (IOException e) {
-//                                throw new RuntimeException(e);
-//                            }
-//                        } catch (InterruptedException e) {
-//                            throw new RuntimeException(e);
-//                        }
-//
-//                    }
-//                }).start();
+
+                Socket controlSocket = new Socket(host, dynamicPort);
+                Log.d(TAG, "onSurfaceTextureAvailable: controlSocket");
+
+                DataOutputStream oos = new DataOutputStream(controlSocket.getOutputStream());
+                DataInputStream ois = new DataInputStream(controlSocket.getInputStream());
+                textureView.setOnTouchListener((v, event) -> {
+
+                    motionEvents.offer(event);
+                    return true;
+                });
+                new Thread(() -> {
+                    while (true) {
+                        try {
+                            MotionEvent event = motionEvents.take();
+                            try {
+                                oos.writeInt((int) (event.getDownTime()));
+                                oos.writeInt(event.getAction());
+                                oos.writeInt(event.getPointerCount());
+
+                                for (int i = 0; i < event.getPointerCount(); i++) {
+                                    oos.writeInt(event.getPointerId(i));
+                                    oos.writeInt((int) event.getX(i));
+                                    oos.writeInt((int) event.getY(i));
+                                    oos.writeFloat(event.getPressure(i));
+                                }
+                                oos.writeInt(event.getButtonState());
+                                oos.writeInt(event.getSource());
+                                oos.flush();
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+
+                    }
+                }).start();
 
             } catch (Exception e) {
                 e.printStackTrace();

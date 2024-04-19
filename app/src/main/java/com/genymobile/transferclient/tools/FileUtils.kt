@@ -6,8 +6,31 @@ import com.genymobile.transferclient.R
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.text.DecimalFormat
 
 object FileUtils{
+
+
+
+    @JvmStatic
+    fun formatFileSize(sizeInBytes: Long): String {
+        val kiloByte = 1024
+        val megaByte = kiloByte * kiloByte
+        val gigaByte = megaByte * kiloByte
+        val teraByte = gigaByte * kiloByte
+
+        if (sizeInBytes < kiloByte) {
+            return "$sizeInBytes B"
+        } else if (sizeInBytes < megaByte) {
+            return DecimalFormat("#.##").format(sizeInBytes.toDouble() / kiloByte) + " KB"
+        } else if (sizeInBytes < gigaByte) {
+            return DecimalFormat("#.##").format(sizeInBytes.toDouble() / megaByte) + " MB"
+        } else if (sizeInBytes < teraByte) {
+            return DecimalFormat("#.##").format(sizeInBytes.toDouble() / gigaByte) + " GB"
+        } else {
+            return DecimalFormat("#.##").format(sizeInBytes.toDouble() / teraByte) + " TB"
+        }
+    }
     @JvmStatic
     fun copyAssetsFileToAdbPath(context: Context,fileName:String,targetName:String){
         try {

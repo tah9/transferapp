@@ -140,7 +140,7 @@ fun DeviceList(vm: MainVm, onClick: () -> Unit) {
                     painter = imagePainter,
                     contentDescription = "SVG Image",
                     modifier = Modifier
-                        .size(60.dp)
+                        .size(70.dp)
                         .align(Alignment.CenterVertically)
                         .padding(end = 10.dp, start = 15.dp)
                         .background(/*Color(0xff495d92)*/Color.Transparent)
@@ -149,7 +149,9 @@ fun DeviceList(vm: MainVm, onClick: () -> Unit) {
 //            colorFilter = ColorFilter.tint(Color.Red) // 如果需要对SVG进行着色，可以添加colorFilter
                 )
                 Column(
-                    modifier = Modifier.align(CenterVertically),
+                    modifier = Modifier
+                        .align(CenterVertically)
+                        .weight(1f),
                     verticalArrangement = Arrangement.Center,
                     content = {
                         Text(text = item.model, fontSize = 20.sp)
@@ -161,6 +163,19 @@ fun DeviceList(vm: MainVm, onClick: () -> Unit) {
                         Log.d(TAG, "DeviceList: " + vm.devicesList.size)
                     }
                 )
+                Image(
+                    painter = painterResource(id = R.drawable.connection),
+                    contentDescription = "SVG Image",
+                    modifier = Modifier
+                        .size(70.dp)
+                        .align(Alignment.CenterVertically)
+                        .padding(end = 15.dp, start = 15.dp)
+                        .background(/*Color(0xff495d92)*/Color.Transparent)
+                        .padding(vertical = 5.dp),
+                    contentScale = ContentScale.Fit,
+//            colorFilter = ColorFilter.tint(Color.Red) // 如果需要对SVG进行着色，可以添加colorFilter
+                )
+
             }
         }
     }

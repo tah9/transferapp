@@ -62,6 +62,7 @@ public class ScreenUtil {
         }
         decorView.setSystemUiVisibility(flag);
     }
+
     public static void setTranslateStatusBar(Window window) {
         window.setBackgroundDrawable(new ColorDrawable(0x00000000));
         window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
@@ -74,16 +75,14 @@ public class ScreenUtil {
         window.setType(WindowManager.LayoutParams.TYPE_APPLICATION_PANEL);
     }
 
-    public static void setStatusBarBgColor(Window window,int color) {
-        setTranslateStatusBar(window);
+    public static void setStatusBarBgColor(Window window, int color) {
+//        setTranslateStatusBar(window);
         //设置状态栏颜色
         window.setStatusBarColor(color);
         // 去掉系统状态栏下的windowContentOverlay
         View v = window.findViewById(android.R.id.content);
         if (v != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                v.setForeground(null);
-            }
+            v.setForeground(null);
         }
     }
 }

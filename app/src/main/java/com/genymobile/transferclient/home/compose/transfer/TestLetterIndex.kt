@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,20 +35,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.genymobile.transferclient.home.data.ApplicationInfo
 import com.google.accompanist.drawablepainter.rememberDrawablePainter
-import com.google.android.material.internal.FlowLayout
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 
 private const val TAG = "TestLetterIndex"
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ShowAddressBookView(
+fun AppListContainer(
     data: Map<Char, List<ApplicationInfo>>,
     onClick: (ApplicationInfo) -> Unit
 ) {
 
-    AddressBookView(
+    AppListLayout(
         data = data,
         modifier = Modifier
 //            .padding(top = 80.dp/*, bottom = 50.dp*/)
@@ -97,7 +94,7 @@ fun ShowAddressBookView(
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
-fun AddressBookView(
+fun AppListLayout(
     data: Map<Char, List<ApplicationInfo>>,
     modifier: Modifier = Modifier,
     contentBody: @Composable (item: ApplicationInfo) -> Unit,
