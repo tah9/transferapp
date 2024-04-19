@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Point
 import android.os.Build
+import android.os.Process
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -22,14 +23,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.sourceforge.pinyin4j.PinyinHelper
+import java.io.BufferedReader
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.io.IOException
+import java.io.InputStreamReader
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.regex.Pattern
 import kotlin.concurrent.thread
+
 
 class MainVm(val mContext: Activity) : ViewModel() {
     private val scope = viewModelScope
@@ -56,10 +61,9 @@ class MainVm(val mContext: Activity) : ViewModel() {
     val localDevice by lazy { createDevice(mContext) }
 
     init {
-
         scope.launch(Dispatchers.IO) {
             scannerApps()
-            asyncStartKernel() //使用Root直接启动服务
+//            asyncStartKernel() //启动服务
             passivityConnection()
             connectionService()
         }
@@ -100,13 +104,12 @@ class MainVm(val mContext: Activity) : ViewModel() {
         2通知连接的设备接收新端口
         将端口发送给它
          */
-        val optStr =
-            "dpi=${localDevice.dpi},displayRegion=0-0-${localDevice.height}-${localDevice.width}"
+        val device = devicesList[index]
+        val optStr = "dpi=${device.dpi},displayRegion=0-0-${device.width}-${device.height}"
         Log.d(TAG, "appRelay: optStr=$optStr")
 
 
         thread {
-            Log.d(TAG, "appRelay: ${mainSocket==null}")
             val mainDataOutputStream = mainSocket!!.dataOutputStream
             mainDataOutputStream.writeInt(MessageType.APP)
             mainDataOutputStream.writeUTF(packageName)
@@ -117,18 +120,6 @@ class MainVm(val mContext: Activity) : ViewModel() {
             dataOutputStream.writeInt(MessageType.APP)
             dataOutputStream.writeInt(dynamicPort)
 
-//            val instantName = transferService?.appRunOnTargetDisplay(packageName, optStr)
-//            Log.d(TAG, "appRelay: instantName=$instantName")
-
-            //找到本机可用端口,用其转发本地套接字
-//            val serverSocket = ServerSocket(0)
-//            val dynamicPort = serverSocket.localPort
-//            serverSocket.close()
-//            RunProcess.runProcess("forward tcp:${dynamicPort} localabstract:${instantName}")
-//            val dataOutputStream = socketList[index].dataOutputStream
-//            dataOutputStream.writeInt(MessageType.APP)
-//            dataOutputStream.flush()
-//            dataOutputStream.writeInt(dynamicPort)
 
         }
     }
@@ -223,26 +214,10 @@ class MainVm(val mContext: Activity) : ViewModel() {
 
         val path = mContext.filesDir.absolutePath + "/" + targetJarFileName
 
-        val terminal = "CLASSPATH=$path app_process / com.genymobile.transfer.Server "
+        val terminal = "CLASSPATH=$path app_process / com.genymobile.transfer.Server"
 
         Log.d(TAG, "onCreate: terminal=$terminal")
 
-        //杀死上次的服务
-        val str = RunProcess.runProcess("su -c ss -plnt | grep :${PortConfig.MAIN_PORT}")
-        fun extractPidFromOutput(output: String): Int? {
-            val pattern = Pattern.compile("(?<=pid=)(\\d+)")
-            val matcher = pattern.matcher(output)
-            return if (matcher.find()) {
-                matcher.group(1)?.toIntOrNull()
-            } else {
-                null
-            }
-        }
-
-        val killResult = RunProcess.runProcess("su -c kill -9 ${extractPidFromOutput(str)}")
-        Log.d(TAG, "asyncStartKernel: 旧服务被杀死 $killResult")
-//        delay(3000)
-//        RunProcess.runProcessAsync("su -c $terminal")
     }
 
 
@@ -253,39 +228,21 @@ class MainVm(val mContext: Activity) : ViewModel() {
         如使用localSocket(普通应用连不上,权限问题)
         本次使用socket通信
          */
-//        val clazz = Class.forName("android.os.ServiceManager")
-//        val method = clazz.getMethod("getService", String::class.java)
-        //3000/50=60
-        //会尝试等待3秒
         var count = 0
-        while (count++ < 240) {
+        while (count++ < 60) {
             try {
                 val socket = Socket("localhost", PortConfig.MAIN_PORT)
                 if (socket.isConnected) {
                     mainSocket = CustomSocket(socket)
                     kernelRunning.value = true
                     Log.d(TAG, "核心服务已经连接")
-                    count = 999
+                    count = Int.MAX_VALUE
                 }
             } catch (e: Exception) {
-                delay(50)
+                delay(1000)
                 Log.d(TAG, "connectionService: ")
             }
         }
-//        repeat(60) {
-//            val tempAny = method.invoke(
-//                null,
-//                "TransferService"
-//            )
-//            tempAny?.let { binder ->
-//                transferService = ITransferInterface.Stub.asInterface(binder as IBinder)
-//                kernelRunning.value = true
-//                Log.d(TAG, "核心服务已经连接")
-//                return@repeat
-//            } ?: run {
-//                delay(50)
-//            }
-//        }
     }
 
 

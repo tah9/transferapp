@@ -5,21 +5,28 @@ import android.app.Activity;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.graphics.SurfaceTexture;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.TextureView;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.genymobile.transferclient.tools.FileUtils;
 import com.genymobile.transferclient.tools.RunProcess;
+import com.genymobile.transferclient.tools.ScreenUtil;
 
 import java.io.BufferedReader;
 import java.io.DataInputStream;
@@ -41,9 +48,16 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        textureView = new TextureView(this);
-        textureView.setSurfaceTextureListener(this);
-        setContentView(textureView);
+        ScreenUtil.changeFullScreen(this, true);
+
+//        setContentView(R.layout.activity_main);
+
+
+//        textureView = new TextureView(this);
+//        textureView.setSurfaceTextureListener(this);
+//        setContentView(textureView);
+
+
     }
 
     private final LinkedBlockingQueue<MotionEvent> motionEvents = new LinkedBlockingQueue<>();
@@ -60,7 +74,7 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         if (dynamicPort == -1) finish();
         new Thread(() -> {
             try {
-                Socket videoSocket = new Socket(host,dynamicPort);
+                Socket videoSocket = new Socket(host, dynamicPort);
                 Log.d(TAG, "socket connection finish " + dynamicPort);
                 InputStream inputStream = videoSocket.getInputStream();
                 FileDescriptor fileDescriptor = ParcelFileDescriptor.fromSocket(videoSocket).getFileDescriptor();
@@ -70,8 +84,8 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
                 DisplayMetrics displayMetrics = new DisplayMetrics();
                 windowManager.getDefaultDisplay().getMetrics(displayMetrics);
                 VideoDecoder videoDecoder = new VideoDecoder(new Surface(surface),
-                        displayMetrics.widthPixels%2!=0?displayMetrics.widthPixels-1:displayMetrics.widthPixels,
-                        displayMetrics.heightPixels%2!=0?displayMetrics.heightPixels-1:displayMetrics.heightPixels,
+                        displayMetrics.widthPixels % 2 != 0 ? displayMetrics.widthPixels - 1 : displayMetrics.widthPixels,
+                        displayMetrics.heightPixels % 2 != 0 ? displayMetrics.heightPixels - 1 : displayMetrics.heightPixels,
 //                        1080, 2326,
                         fileDescriptor, inputStream);
 //                Socket controlSocket = serverSocket.accept();

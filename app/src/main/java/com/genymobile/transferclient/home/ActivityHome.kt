@@ -1,9 +1,12 @@
 package com.genymobile.transferclient.home
 
+import android.content.Intent
 import android.os.Bundle
+import android.os.Process
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.example.myapplication.ui.theme.MyApplicationTheme
+import com.genymobile.transferclient.MainActivity
 import com.genymobile.transferclient.home.compose.TabView
 import com.genymobile.transferclient.home.compose.transfer.AppListContainer
 import com.genymobile.transferclient.home.compose.transfer.DevicesContainer
@@ -42,7 +46,7 @@ class ActivityHome : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 //        enableEdgeToEdge() //全屏显示
-
+        startActivity(Intent(this, MainActivity::class.java))
 
         setContent {
             MyApplicationTheme() {
