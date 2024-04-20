@@ -1,7 +1,7 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
-
+    id 'kotlin-kapt'
 }
 
 android {
@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId "com.genymobile.transferclient"
-        minSdk 24
+        minSdk 26
         targetSdk 34
         versionCode 1
         versionName "1.0"
@@ -19,7 +19,7 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
     buildFeatures {
         compose = true
@@ -42,13 +42,21 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 }
 
 dependencies {
 
+    //room版本不同会有问题,可以去除suspend关键字
+    def room_version = "2.6.1"
+    implementation "androidx.room:room-runtime:$room_version"
+    implementation "androidx.room:room-ktx:$room_version"
+    kapt "androidx.room:room-compiler:$room_version"
+    //preview
+    debugImplementation("androidx.compose.ui:ui-tooling:1.6.1")
+    implementation("androidx.compose.ui:ui-tooling-preview:1.6.1")
     implementation 'com.tencent:mmkv:1.3.4'
     implementation "com.google.accompanist:accompanist-drawablepainter:0.28.0"
     implementation 'com.belerweb:pinyin4j:2.5.0'//拼音转字母

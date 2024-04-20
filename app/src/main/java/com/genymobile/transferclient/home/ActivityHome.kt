@@ -8,38 +8,26 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AlertDialogDefaults
-import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.lifecycleScope
 import com.example.myapplication.ui.theme.MyApplicationTheme
+import com.genymobile.transferclient.home.compose.DeviceListDialog
 import com.genymobile.transferclient.home.compose.TabView
 import com.genymobile.transferclient.home.compose.connection.ConnectionContainer
 import com.genymobile.transferclient.home.compose.file.FilesContainer
 import com.genymobile.transferclient.home.compose.transfer.AppListContainer
-import com.genymobile.transferclient.home.compose.transfer.DevicesContainer
-import com.genymobile.transferclient.home.data.DownloadHistory
-import com.genymobile.transferclient.tools.ScreenUtil
+import com.genymobile.transferclient.tools.getUriInfo
 import com.genymobile.transferclient.tools.requestReadWritePermissions
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import java.util.Date
 
 
 class ActivityHome : ComponentActivity() {
@@ -48,14 +36,16 @@ class ActivityHome : ComponentActivity() {
 
     val vm by lazy { MainVm(context) }
 
+
+    @SuppressLint("Range")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == MessageType.FILE) {
             // 获取返回的文件URI
             if (data?.data != null) {
                 val fileUri = data.data
-                // 处理文件URI，例如读取文件内容
-                Log.d(TAG, "onActivityResult: single")
+                vm.transferFileUri = fileUri
+                vm.showTransferFileDialog.value = true
             }
 
             // 对于多选文件
@@ -71,35 +61,12 @@ class ActivityHome : ComponentActivity() {
         }
     }
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 //        enableEdgeToEdge() //全屏显示
 
         requestReadWritePermissions()
-
-        // 示例：插入一条下载历史记录
-        lifecycleScope.launch(Dispatchers.IO) {
-            val newHistory = DownloadHistory(
-                fileName = "example_file.mp4",
-                fileSize = 1024 * 1024,
-                downloadPath = "/sdcard/Download/test.mp4", // 假设这是一个有效的下载路径
-                downloadTime = Date(),
-                status = "成功"
-            )
-            vm.listHistory.add(newHistory)
-            vm.listHistory.add(newHistory)
-            vm.listHistory.add(newHistory)
-            vm.listHistory.add(newHistory)
-            vm.listHistory.add(
-                DownloadHistory(
-                    fileName = "example_file.pdf",
-                    fileSize = 123435,
-                    downloadPath = "/sdcard/Download/test.pdf", // 假设这是一个有效的下载路径
-                    downloadTime = Date(),
-                    status = "成功"
-                )
-            )
-        }
 
 
         setContent {
@@ -113,29 +80,22 @@ class ActivityHome : ComponentActivity() {
                         if (vm.homeActiveIndex.value == 0) {
                             ConnectionContainer(vm)
                         } else if (vm.homeActiveIndex.value == 1) {
+                            // todo 把逻辑整理到一个compose
                             var packageName by remember { mutableStateOf<String?>(null) }
-                            var showDialog by remember { mutableStateOf(false) }
                             AppListContainer(context, vm, onClick = {
                                 packageName = it.packageName
-                                showDialog = true
+                                vm.showTransferAppDialog.value = true
                             })
-                            if (showDialog) {
-                                AlertDialog(
-                                    onDismissRequest = { showDialog = false },
-                                    title = { Text("选择接力设备") },
-                                    text = {
-                                        DevicesContainer(context, vm) {
-                                            Log.d(TAG, "onCreate: $packageName")
-                                            vm.appRelay(packageName!!, it)
-                                        }
-                                    },
-                                    confirmButton = {},
-                                    dismissButton = {
-                                        Button(onClick = { showDialog = false }, enabled = true) {
-                                            Text("关闭")
-                                        }
-                                    },
-                                    shape = AlertDialogDefaults.shape,
+                            if (vm.showTransferAppDialog.value) {
+                                DeviceListDialog(
+                                    title = "选择接力设备",
+                                    vm = vm,
+                                    vm.showTransferAppDialog,
+                                    onDeviceClick = {
+                                        Log.d(TAG, "onCreate: $packageName")
+                                        vm.appRelay(packageName!!, it)
+                                        vm.showTransferAppDialog.value = false
+                                    }
                                 )
                             }
                         } else {

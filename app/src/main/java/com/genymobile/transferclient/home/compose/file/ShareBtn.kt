@@ -41,7 +41,7 @@ fun ShareBtn(vm: MainVm, modifier: Modifier) {
                     val intent = Intent(Intent.ACTION_GET_CONTENT)
                     intent.setType("*/*")
 // 设置可多选
-                    intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                    intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false)
 // 启动Activity来选择文件
                     vm.mContext.startActivityForResult(
                         Intent.createChooser(intent, "选择文件"),

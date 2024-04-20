@@ -1,40 +1,41 @@
 package com.genymobile.transferclient.home
 
 import android.app.Activity
-import android.bluetooth.BluetoothAdapter
 import android.content.Intent
 import android.graphics.Point
+import android.net.Uri
 import android.os.Build
-import android.os.Process
+import android.os.Environment
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.Room
 import com.genymobile.transfer.ITransferInterface
 import com.genymobile.transferclient.MainActivity
 import com.genymobile.transferclient.config.PortConfig
 import com.genymobile.transferclient.home.data.ApplicationInfo
 import com.genymobile.transferclient.home.data.Device
 import com.genymobile.transferclient.home.data.DownloadHistory
+import com.genymobile.transferclient.home.data.DownloadHistoryDao
+import com.genymobile.transferclient.home.data.DownloadHistoryDatabase
 import com.genymobile.transferclient.tools.FileUtils
-import com.genymobile.transferclient.tools.RunProcess
+import com.genymobile.transferclient.tools.getUriInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.sourceforge.pinyin4j.PinyinHelper
-import java.io.BufferedReader
 import java.io.DataInputStream
 import java.io.DataOutputStream
-import java.io.IOException
-import java.io.InputStreamReader
+import java.io.File
+import java.io.FileOutputStream
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.net.ServerSocket
 import java.net.Socket
-import java.util.regex.Pattern
 import kotlin.concurrent.thread
 
 
@@ -49,6 +50,8 @@ class MainVm(val mContext: Activity) : ViewModel() {
         val inputStream = socket.getInputStream()
         val dataOutputStream = DataOutputStream(outputStream)
         val dataInputStream = DataInputStream(inputStream)
+        val objectOutputStream = ObjectOutputStream(outputStream)
+        val objectInputStream = ObjectInputStream(inputStream)
     }
 
     var listHistory = mutableStateListOf<DownloadHistory>()
@@ -61,8 +64,14 @@ class MainVm(val mContext: Activity) : ViewModel() {
     var transferService: ITransferInterface? = null
     var mainSocket: CustomSocket? = null
 
+    var showTransferFileDialog = mutableStateOf(false)
+    var transferFileUri: Uri? = null
+    var showTransferAppDialog = mutableStateOf(false)
 
     val localDevice by lazy { createDevice(mContext) }
+
+    lateinit var database: DownloadHistoryDatabase
+    val downloadHistoryDao: DownloadHistoryDao by lazy { database.downloadHistoryDao() }
 
     init {
         scope.launch(Dispatchers.IO) {
@@ -70,6 +79,79 @@ class MainVm(val mContext: Activity) : ViewModel() {
 //            asyncStartKernel() //启动服务
             passivityConnection()
             connectionService()
+        }
+        scope.launch(Dispatchers.IO) {
+            // 初始化数据库
+            database = Room.databaseBuilder(
+                mContext,
+                DownloadHistoryDatabase::class.java,
+                "download_history.db"
+            ).build()
+            val allHistories = downloadHistoryDao.getAllHistories()
+            Log.d(TAG, "list size=${allHistories.size} ")
+            withContext(Dispatchers.Main) {
+                allHistories.forEach { item ->
+                    listHistory.add(item)
+                }
+            }
+        }
+    }
+
+    fun uploadFile(index: Int) {
+        thread {
+
+            val customSocket = socketList[index]
+            /*
+               发送文件
+              0 发送文件名称
+              1 发送文件大小 long
+              2 循环:发送数据包大小 int
+              3 循环:发送数据包
+              4 循环:发送进度 float
+              5 结束标识 int -1
+                */
+            val uriInfo = transferFileUri!!.getUriInfo(mContext)
+            val newHistory = DownloadHistory(
+                fileName = uriInfo.second,
+                fileSize = uriInfo.first,
+                downloadTime = System.currentTimeMillis(),
+                downloadPath = transferFileUri.toString(),
+                status = "发送中"
+            )
+            scope.launch(Dispatchers.IO) {
+                downloadHistoryDao.insert(newHistory)
+                withContext(Dispatchers.Main) {
+                    listHistory.add(newHistory)
+                }
+            }
+
+
+            val transferFileUri = transferFileUri!!
+            val sizeFromUri = uriInfo.first
+            Log.d(TAG, "FilesContainer: sizeFromUri$sizeFromUri")
+            val dataOutputStream = customSocket.dataOutputStream
+            dataOutputStream.writeInt(MessageType.FILE)
+            dataOutputStream.writeUTF(uriInfo.second)
+            dataOutputStream.writeLong(sizeFromUri)
+            val inputStream = mContext.contentResolver.openInputStream(transferFileUri)
+            val buffer = ByteArray(8192)
+            var readBytesLength: Int
+            var currentSize: Long = 0
+            while (inputStream!!.read(buffer).also { readBytesLength = it } > 0) {
+                dataOutputStream.writeInt(readBytesLength)
+                dataOutputStream.write(buffer, 0, readBytesLength)
+                currentSize += readBytesLength
+                val progress: Float = currentSize / sizeFromUri.toFloat()
+                dataOutputStream.writeFloat(progress)
+                newHistory.progress = progress
+                Log.d("FilesContainer: ", "FilesContainer: progress=$progress")
+            }
+            dataOutputStream.writeInt(-1)
+            scope.launch(Dispatchers.Main) {
+                listHistory.remove(newHistory)
+                newHistory.status = "发送完成"
+                listHistory.add(newHistory)
+            }
         }
     }
 
@@ -83,6 +165,7 @@ class MainVm(val mContext: Activity) : ViewModel() {
             val dataInputStream = customSocket.dataInputStream
             while (true) {
                 val messageType = dataInputStream.readInt()
+                Log.d(TAG, "receiverListener: messageType=$messageType")
                 //接力app
                 if (messageType == MessageType.APP) {
                     Log.d(TAG, "receiverListener: after type")
@@ -96,8 +179,66 @@ class MainVm(val mContext: Activity) : ViewModel() {
                     mContext.startActivity(intent)
                 }
                 //接受文件
-                if (messageType==MessageType.FILE){
+                else if (messageType == MessageType.FILE) {
+                    Log.d(TAG, "receiverListener: file")
+                    val fileName = dataInputStream.readUTF()
+                    val fileSize = dataInputStream.readLong()
 
+                    // 创建文件输出流准备写入接收到的文件数据
+                    val outputFile =
+                        File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)!!.absolutePath + "/" + fileName)
+
+                    val newHistory = DownloadHistory(
+                        fileName = fileName,
+                        fileSize = fileSize,
+                        downloadTime = System.currentTimeMillis(),
+                        downloadPath = transferFileUri.toString(),
+                        status = "接收中"
+                    )
+                    scope.launch(Dispatchers.IO) {
+                        downloadHistoryDao.insert(newHistory)
+                        withContext(Dispatchers.Main) {
+                            listHistory.add(newHistory)
+                        }
+                    }
+
+                    if (outputFile.exists()) outputFile.delete()
+
+                    val fileOutputStream = FileOutputStream(outputFile)
+
+                    // 缓冲区
+                    val buffer = ByteArray(8192)
+                    var readBytesLength: Int
+                    var currentSize: Long = 0
+
+                    // 开始接收文件数据
+                    while (true) {
+                        readBytesLength = dataInputStream.readInt()
+                        if (readBytesLength == -1) {
+                            // 文件传输结束标志
+                            break
+                        }
+
+                        // 读取数据块
+                        dataInputStream.readFully(buffer, 0, readBytesLength)
+                        fileOutputStream.write(buffer, 0, readBytesLength)
+
+                        currentSize += readBytesLength
+
+                        // 可以读取进度信息，但在这个示例中我们仅接收文件，不处理进度
+                        val progress: Float = dataInputStream.readFloat()
+                        newHistory.progress = progress
+
+                        // 可以在这里打印或处理进度信息
+                        Log.d("Receiver: ", "Progress: $progress")
+                    }
+                    scope.launch(Dispatchers.Main) {
+                        listHistory.remove(newHistory)
+                        newHistory.status = "接收完成"
+                        listHistory.add(newHistory)
+                    }
+                    Log.d(TAG, "receiverListener: outputFileSize=${outputFile.length()}")
+                    Log.d(TAG, "receiverListener: outputFilePath=${outputFile.absolutePath}")
                 }
             }
 
@@ -148,7 +289,7 @@ class MainVm(val mContext: Activity) : ViewModel() {
                 val fromOtherDeviceSocket = serverSocket.accept()
                 val customSocket = CustomSocket(fromOtherDeviceSocket)
                 socketList.add(customSocket)
-                Log.d(TAG, "新设备连接")
+                Log.d(TAG, "被动连接->新设备连接")
                 //
                 thread {
                     val outputStream = fromOtherDeviceSocket.getOutputStream()
@@ -158,6 +299,8 @@ class MainVm(val mContext: Activity) : ViewModel() {
                     val objectOutputStream = ObjectOutputStream(outputStream)
 
                     val remoteDevice: Device = objectInputStream.readObject() as Device
+                    //todo 不可以连接自己
+
                     devicesList.add(remoteDevice)
                     objectOutputStream.writeObject(localDevice)
                     objectOutputStream.flush()
@@ -248,7 +391,7 @@ class MainVm(val mContext: Activity) : ViewModel() {
                 }
             } catch (e: Exception) {
                 delay(1000)
-                Log.d(TAG, "connectionService: ")
+//                Log.d(TAG, "connectionService: ")
             }
         }
     }
@@ -263,7 +406,6 @@ class MainVm(val mContext: Activity) : ViewModel() {
         display.getRealSize(size)
         val width = size.x  // 屏幕宽度（像素）
         val height = size.y  // 屏幕高度（像素）
-
 
         val dpi = context.resources.displayMetrics.densityDpi  // 屏幕 DPI
 
