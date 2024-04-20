@@ -103,7 +103,7 @@ public class VideoDecoder {
                 public void onInputBufferAvailable(@NonNull MediaCodec mediaCodec, int inIndex) {
 //                    decodeIn(inIndex);
                     try {
-                        Log.d(TAG, "onInputBufferAvailable: put" + inIndex);
+//                        Log.d(TAG, "onInputBufferAvailable: put" + inIndex);
                         inputBufferQueue.put(inIndex);
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);

@@ -20,6 +20,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -43,6 +44,11 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class MainActivity extends Activity implements TextureView.SurfaceTextureListener {
 
     private TextureView textureView;
+    private int decoderHeight;
+    private int decoderWidth;
+    private int dynamicPort;
+    private String host;
+    private String type;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -50,10 +56,35 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
 
         ScreenUtil.changeFullScreen(this, true);
 
+        Intent intent = getIntent();
+        host = intent.getStringExtra("host");
+        dynamicPort = intent.getIntExtra("dynamicPort", -1);
+        if (dynamicPort == -1) finish();
+        type = intent.getStringExtra("type");
+        if (type.equals("appRelay")) {
+            WindowManager windowManager = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+            DisplayMetrics displayMetrics = new DisplayMetrics();
+            windowManager.getDefaultDisplay().getMetrics(displayMetrics);
+
+            decoderWidth = displayMetrics.widthPixels % 2 != 0 ? displayMetrics.widthPixels - 1 : displayMetrics.widthPixels;
+            decoderHeight = displayMetrics.heightPixels % 2 != 0 ? displayMetrics.heightPixels - 1 : displayMetrics.heightPixels;
+
+        } else {
+            decoderWidth = intent.getIntExtra("width", 0);
+            decoderHeight = intent.getIntExtra("height", 0);
+        }
 
         textureView = new TextureView(this);
         textureView.setSurfaceTextureListener(this);
-        setContentView(textureView);
+        LinearLayout layout = new LinearLayout(this);
+        layout.setGravity(Gravity.CENTER);
+        layout.addView(textureView);
+        LinearLayout.LayoutParams layoutParams = (LinearLayout.LayoutParams) textureView.getLayoutParams();
+        layoutParams.width = decoderWidth;
+        layoutParams.height = decoderHeight;
+        textureView.setLayoutParams(layoutParams);
+
+        setContentView(layout);
 
 
     }
@@ -66,10 +97,8 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     @Override
     public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
         Log.d(TAG, "onSurfaceTextureAvailable: ");
-        Intent intent = getIntent();
-        String host = intent.getStringExtra("host");
-        int dynamicPort = intent.getIntExtra("dynamicPort", -1);
-        if (dynamicPort == -1) finish();
+
+
         new Thread(() -> {
             try {
                 Socket videoSocket = new Socket(host, dynamicPort);
@@ -78,12 +107,10 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
                 FileDescriptor fileDescriptor = ParcelFileDescriptor.fromSocket(videoSocket).getFileDescriptor();
 //                videoSocket.close();
 
-                WindowManager windowManager = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
-                DisplayMetrics displayMetrics = new DisplayMetrics();
-                windowManager.getDefaultDisplay().getMetrics(displayMetrics);
+
                 VideoDecoder videoDecoder = new VideoDecoder(new Surface(surface),
-                        displayMetrics.widthPixels % 2 != 0 ? displayMetrics.widthPixels - 1 : displayMetrics.widthPixels,
-                        displayMetrics.heightPixels % 2 != 0 ? displayMetrics.heightPixels - 1 : displayMetrics.heightPixels,
+                        decoderWidth,
+                        decoderHeight,
                         fileDescriptor, inputStream);
 
                 Socket controlSocket = new Socket(host, dynamicPort);
@@ -92,7 +119,6 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
                 DataOutputStream oos = new DataOutputStream(controlSocket.getOutputStream());
                 DataInputStream ois = new DataInputStream(controlSocket.getInputStream());
                 textureView.setOnTouchListener((v, event) -> {
-
                     motionEvents.offer(event);
                     return true;
                 });

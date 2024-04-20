@@ -36,6 +36,7 @@ import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.net.ServerSocket
 import java.net.Socket
+import java.text.DecimalFormat
 import kotlin.concurrent.thread
 
 
@@ -50,15 +51,15 @@ class MainVm(val mContext: Activity) : ViewModel() {
         val inputStream = socket.getInputStream()
         val dataOutputStream = DataOutputStream(outputStream)
         val dataInputStream = DataInputStream(inputStream)
-        val objectOutputStream = ObjectOutputStream(outputStream)
-        val objectInputStream = ObjectInputStream(inputStream)
+//        val objectOutputStream = ObjectOutputStream(outputStream)
+//        val objectInputStream = ObjectInputStream(inputStream)
     }
 
     var listHistory = mutableStateListOf<DownloadHistory>()
 
     val devicesList = mutableStateListOf<Device>()
     val socketList = mutableStateListOf<CustomSocket>()
-    var homeActiveIndex = mutableStateOf(2)
+    var homeActiveIndex = mutableStateOf(0)
     val kernelRunning = mutableStateOf(false)
 
     var transferService: ITransferInterface? = null
@@ -92,10 +93,13 @@ class MainVm(val mContext: Activity) : ViewModel() {
             withContext(Dispatchers.Main) {
                 allHistories.forEach { item ->
                     listHistory.add(item)
+//                    downloadHistoryDao.deleteById(item.id)
                 }
             }
         }
     }
+
+    val format = DecimalFormat("#.0")
 
     fun uploadFile(index: Int) {
         thread {
@@ -118,11 +122,8 @@ class MainVm(val mContext: Activity) : ViewModel() {
                 downloadPath = transferFileUri.toString(),
                 status = "发送中"
             )
-            scope.launch(Dispatchers.IO) {
-                downloadHistoryDao.insert(newHistory)
-                withContext(Dispatchers.Main) {
-                    listHistory.add(newHistory)
-                }
+            scope.launch(Dispatchers.Main) {
+                listHistory.add(0, newHistory)
             }
 
 
@@ -143,26 +144,33 @@ class MainVm(val mContext: Activity) : ViewModel() {
                 currentSize += readBytesLength
                 val progress: Float = currentSize / sizeFromUri.toFloat()
                 dataOutputStream.writeFloat(progress)
-                newHistory.progress = progress
+                scope.launch(Dispatchers.Main) {
+                    listHistory[0] = listHistory.first().copy(
+                        status = "发送中(${format.format(progress * 100)}%)"
+                    )
+                }
                 Log.d("FilesContainer: ", "FilesContainer: progress=$progress")
             }
             dataOutputStream.writeInt(-1)
             scope.launch(Dispatchers.Main) {
-                listHistory.remove(newHistory)
-                newHistory.status = "发送完成"
-                listHistory.add(newHistory)
+                listHistory[0] = listHistory.first().copy(
+                    status = "发送完成"
+                )
+                withContext(Dispatchers.IO) {
+                    downloadHistoryDao.insert(listHistory.first())
+                }
             }
         }
     }
 
     private fun receiverListener(
-        host: String,
         objectOutputStream: ObjectOutputStream,
         objectInputStream: ObjectInputStream,
-        customSocket: CustomSocket
+        remoteSocket: CustomSocket
     ) {
         thread {
-            val dataInputStream = customSocket.dataInputStream
+            val host = remoteSocket.socket.inetAddress.hostAddress
+            val dataInputStream = remoteSocket.dataInputStream
             while (true) {
                 val messageType = dataInputStream.readInt()
                 Log.d(TAG, "receiverListener: messageType=$messageType")
@@ -171,12 +179,26 @@ class MainVm(val mContext: Activity) : ViewModel() {
                     Log.d(TAG, "receiverListener: after type")
                     val dynamicPort = dataInputStream.readInt()
                     Log.d(TAG, "receiverListener: after port")
-                    Log.d(TAG, "receiverListener: host=${host},dynamicPort=${dynamicPort}")
+                    Log.d(TAG, "receiverListener: host=$host,dynamicPort=${dynamicPort}")
 
                     val intent = Intent(mContext, MainActivity::class.java)
                         .putExtra("host", host)
                         .putExtra("dynamicPort", dynamicPort)
+                        .putExtra("type", "appRelay")
                     mContext.startActivity(intent)
+                }
+                //被镜像
+                /*
+                这里的用户模型比较有意思,此处逻辑只是被镜像的交互app逻辑
+                 */
+                else if (messageType == MessageType.MIRROR) {
+                    Log.d(TAG, "receiverListener: mirror")
+                    //通知核心服务
+                    mainSocket!!.dataOutputStream.writeInt(MessageType.MIRROR)
+                    //接收分配的端口
+                    val dynamicPort = mainSocket!!.dataInputStream.readInt()
+                    //将端口发送给远程设备
+                    remoteSocket.dataOutputStream.writeInt(dynamicPort)
                 }
                 //接受文件
                 else if (messageType == MessageType.FILE) {
@@ -195,14 +217,12 @@ class MainVm(val mContext: Activity) : ViewModel() {
                         downloadPath = transferFileUri.toString(),
                         status = "接收中"
                     )
-                    scope.launch(Dispatchers.IO) {
-                        downloadHistoryDao.insert(newHistory)
-                        withContext(Dispatchers.Main) {
-                            listHistory.add(newHistory)
-                        }
+                    scope.launch(Dispatchers.Main) {
+                        listHistory.add(0, newHistory)
                     }
 
-                    if (outputFile.exists()) outputFile.delete()
+
+//                    if (outputFile.exists()) outputFile.delete()
 
                     val fileOutputStream = FileOutputStream(outputFile)
 
@@ -227,24 +247,56 @@ class MainVm(val mContext: Activity) : ViewModel() {
 
                         // 可以读取进度信息，但在这个示例中我们仅接收文件，不处理进度
                         val progress: Float = dataInputStream.readFloat()
-                        newHistory.progress = progress
+                        scope.launch(Dispatchers.Main) {
+                            listHistory[0] = listHistory.first().copy(
+                                status = "接收中(${format.format(progress * 100)}%)"
+                            )
+                        }
 
                         // 可以在这里打印或处理进度信息
                         Log.d("Receiver: ", "Progress: $progress")
                     }
                     scope.launch(Dispatchers.Main) {
-                        listHistory.remove(newHistory)
-                        newHistory.status = "接收完成"
-                        listHistory.add(newHistory)
+                        listHistory[0] = listHistory.first().copy(
+                            status = "接收完成"
+                        )
+                        withContext(Dispatchers.IO) {
+                            downloadHistoryDao.insert(listHistory.first())
+                        }
                     }
-                    Log.d(TAG, "receiverListener: outputFileSize=${outputFile.length()}")
-                    Log.d(TAG, "receiverListener: outputFilePath=${outputFile.absolutePath}")
                 }
             }
 
         }
     }
 
+    //镜像
+    /*
+    此处是主动镜像交互app逻辑
+     */
+    fun mirrorDevice(deviceIndex: Int) {
+        /*
+        1 通知其他通知被镜像的设备,开始镜像屏幕
+        2 交互程序接收分配的端口号
+        3 交互程序通知连接的设备接收新端口
+        4 交互程序将host和端口发送给它
+         */
+        thread {
+            val customSocket = socketList[deviceIndex]
+            customSocket.dataOutputStream.writeInt(MessageType.MIRROR)
+            val dynamicPort = customSocket.dataInputStream.readInt()
+            val intent = Intent(mContext, MainActivity::class.java)
+            intent.putExtra("host", customSocket.socket.inetAddress.hostAddress)
+            intent.putExtra("dynamicPort", dynamicPort)
+            intent.putExtra("type", "mirror")
+            val remoteDevice = devicesList[deviceIndex]
+            intent.putExtra("width", remoteDevice.width)
+            intent.putExtra("height", remoteDevice.height)
+            mContext.startActivity(intent)
+        }
+    }
+
+    //应用接力
     fun appRelay(packageName: String, index: Int) {
         /*
         1通知服务,开始应用接力
@@ -268,7 +320,6 @@ class MainVm(val mContext: Activity) : ViewModel() {
             val dataOutputStream = socketList[index].dataOutputStream
             dataOutputStream.writeInt(MessageType.APP)
             dataOutputStream.writeInt(dynamicPort)
-
 
         }
     }
@@ -308,7 +359,6 @@ class MainVm(val mContext: Activity) : ViewModel() {
                     Log.d(TAG, "onCreate: receive $remoteDevice")
 
                     receiverListener(
-                        fromOtherDeviceSocket.inetAddress.hostAddress!!,
                         objectOutputStream,
                         objectInputStream,
                         customSocket
@@ -348,7 +398,6 @@ class MainVm(val mContext: Activity) : ViewModel() {
             devicesList.add(remoteDevice)
 
             receiverListener(
-                otherSocket.inetAddress.hostAddress!!,
                 objectOutputStream,
                 objectInputStream,
                 customSocket
@@ -383,9 +432,15 @@ class MainVm(val mContext: Activity) : ViewModel() {
         while (count++ < 60) {
             try {
                 val socket = Socket("localhost", PortConfig.MAIN_PORT)
+//                Log.d(TAG, "connectionService: ${socket.isConnected}")
                 if (socket.isConnected) {
-                    mainSocket = CustomSocket(socket)
-                    kernelRunning.value = true
+                    withContext(Dispatchers.Main) {
+                        Log.d(TAG, "connectionService: 1")
+                        mainSocket = CustomSocket(socket)
+                        Log.d(TAG, "connectionService: 2")
+                        kernelRunning.value = true
+                        Log.d(TAG, "connectionService: 3")
+                    }
                     Log.d(TAG, "核心服务已经连接")
                     count = Int.MAX_VALUE
                 }

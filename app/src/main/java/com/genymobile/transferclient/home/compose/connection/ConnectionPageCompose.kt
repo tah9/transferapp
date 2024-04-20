@@ -3,6 +3,7 @@ package com.genymobile.transferclient.home.compose.connection
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,20 +46,7 @@ fun FindNearDeviceButton(
     onClick: () -> Unit,
     buttonText: String
 ) {
-    Row(
-        verticalAlignment = CenterVertically,
-        modifier = Modifier
-            .padding(top = 16.dp)
-            .height(20.dp)
-//            .background(Color.Red)
-    ) {
-        Text(
-            text = "附近的设备",
-//            color = Color.White,
-            modifier = Modifier.padding(start = 4.dp, end = 4.dp)
-        )
-        Divider(modifier = Modifier.weight(0.9f))
-    }
+    TextDiv(str = "P2P连接")
     Button(
         onClick = onClick,
         modifier = modifier.padding(16.dp)
@@ -70,11 +58,14 @@ fun FindNearDeviceButton(
 
 @Composable
 fun InputConnection(onClick: (String) -> Unit) {
+
+    TextDiv(str = "IP直连")
+
     var text by remember { mutableStateOf("192.168.43.1") }
 
     Row(
         modifier = Modifier
-            .padding(bottom = 16.dp)
+            .padding(bottom = 16.dp, top = 16.dp)
             .background(
                 color = Color(0xffe7e0ec), shape = RoundedCornerShape(16.dp)
             )
@@ -132,6 +123,9 @@ fun DeviceList(vm: MainVm, onClick: () -> Unit) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable {
+                        vm.mirrorDevice(index)
+                    }
                     .height(110.dp)
                     .padding(vertical = 8.dp)
                     .background(color = Color.White, shape = RoundedCornerShape(16.dp))
@@ -164,7 +158,7 @@ fun DeviceList(vm: MainVm, onClick: () -> Unit) {
                     }
                 )
                 Image(
-                    painter = painterResource(id = R.drawable.connection),
+                    painter = painterResource(id = R.drawable.mirror),
                     contentDescription = "SVG Image",
                     modifier = Modifier
                         .size(70.dp)

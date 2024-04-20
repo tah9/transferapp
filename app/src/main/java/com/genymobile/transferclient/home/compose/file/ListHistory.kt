@@ -18,6 +18,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -38,6 +42,14 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 
+@Composable
+fun HorizontalProgressBar(progress: Float) {
+    LinearProgressIndicator(
+        modifier = Modifier.fillMaxWidth(),
+        progress = progress,
+        color = Color.Red,
+    )
+}
 
 @Preview
 @Composable
@@ -48,23 +60,15 @@ fun ListHistory(vm: MainVm = MainVm(Activity())) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.Yellow)
                         .clickable {
-//                            val file = File(item.downloadPath).parentFile
-                            Log.d("FilesContainer", "start: ")
+                            Log.d("FilesContainer", "start: path=${item.downloadPath}")
                             val path: Uri = Uri.parse(item.downloadPath)
-                            val intent = Intent(Intent.ACTION_VIEW);
-//                            path = FileProvider.getUriForFile(
-//                                vm.mContext, "com.genymobile.transferclient.fileprovider",
-//                                file
-//                            );
-                            //注意intent用addFlags 如果intent在这行代码下使用setFlags会导致其他应用没有权限打开你的文件
+                            val intent = Intent(Intent.ACTION_VIEW)
                             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                            intent.setDataAndType(path, "*/*");
+                            intent.setDataAndType(null, "*/*");
                             Log.d("FilesContainer", "middle: ")
                             vm.mContext.startActivity(intent)
                             Log.d("FilesContainer", "end: ")
-
                         }
                         .padding(horizontal = 10.dp, vertical = 5.dp)
                         .clip(RoundedCornerShape(14.dp))
@@ -75,8 +79,7 @@ fun ListHistory(vm: MainVm = MainVm(Activity())) {
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxHeight()
-                            .background(Color.Red),
+                            .height(40.dp),
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
@@ -91,7 +94,15 @@ fun ListHistory(vm: MainVm = MainVm(Activity())) {
                             color = Color.Gray,
                         )
                     }
-                    Column(modifier = Modifier.align(Alignment.CenterVertically)) {
+                    Column(
+                        modifier = Modifier.height(40.dp),
+                        verticalArrangement = Arrangement.SpaceBetween,
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Text(
+                            text = item.status,
+                            fontSize = 14.sp,
+                        )
                         Text(
                             text = SimpleDateFormat(
                                 "MM月dd日 HH:mm:ss",
@@ -99,9 +110,8 @@ fun ListHistory(vm: MainVm = MainVm(Activity())) {
                             ).format(
                                 item.downloadTime
                             ),
-                            color = Color.Gray, fontSize = 12.sp
+                            color = Color.Gray, fontSize = 12.sp,
                         )
-                        Text(text = item.status)
                     }
                 }
             }
