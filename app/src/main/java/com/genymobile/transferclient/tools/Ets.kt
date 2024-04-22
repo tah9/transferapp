@@ -3,7 +3,11 @@ package com.genymobile.transferclient.tools
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.ActivityManager
+import android.app.ActivityManager.RecentTaskInfo
+import android.app.TaskStackBuilder
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.graphics.Bitmap
@@ -17,6 +21,19 @@ import android.util.Log
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.genymobile.transferclient.MainActivity
+
+
+fun Context.reLaunchActivity(intent: Intent) {
+    // 清除目标Activity所在任务栈中的所有其他Activity
+    val clearTaskIntent = TaskStackBuilder.create(this)
+        .addNextIntentWithParentStack(intent).intents[0]
+    clearTaskIntent.flags =
+        Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
+
+    // 启动新的Activity
+    startActivity(clearTaskIntent)
+}
 
 fun Drawable.toBitmap(): ImageBitmap {
     return if (this is BitmapDrawable && bitmap != null) {
@@ -30,6 +47,10 @@ fun Drawable.toBitmap(): ImageBitmap {
     }
 }
 
+/*
+外存读写权限
+定位权限
+ */
 fun Activity.requestReadWritePermissions() {
     val permissionsToRequest = mutableListOf<String>()
 
@@ -43,6 +64,13 @@ fun Activity.requestReadWritePermissions() {
     if (ContextCompat.checkSelfPermission(
             this,
             Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) != PackageManager.PERMISSION_GRANTED
+    ) {
+        permissionsToRequest.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    }
+    if (ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ACCESS_FINE_LOCATION
         ) != PackageManager.PERMISSION_GRANTED
     ) {
         permissionsToRequest.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)

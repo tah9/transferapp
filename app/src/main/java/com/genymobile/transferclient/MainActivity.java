@@ -11,6 +11,7 @@ import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.Display;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.Surface;
@@ -28,6 +29,7 @@ import androidx.annotation.Nullable;
 import com.genymobile.transferclient.tools.FileUtils;
 import com.genymobile.transferclient.tools.RunProcess;
 import com.genymobile.transferclient.tools.ScreenUtil;
+import com.genymobile.transferclient.tools.ScreenUtils;
 
 import java.io.BufferedReader;
 import java.io.DataInputStream;
@@ -62,24 +64,26 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         if (dynamicPort == -1) finish();
         type = intent.getStringExtra("type");
         if (type.equals("appRelay")) {
-            WindowManager windowManager = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
-            DisplayMetrics displayMetrics = new DisplayMetrics();
-            windowManager.getDefaultDisplay().getMetrics(displayMetrics);
+            int realWidth = ScreenUtils.getScreenWidth(this);
+            int realHeight = ScreenUtils.getScreenHeight(this);
 
-            decoderWidth = displayMetrics.widthPixels % 2 != 0 ? displayMetrics.widthPixels - 1 : displayMetrics.widthPixels;
-            decoderHeight = displayMetrics.heightPixels % 2 != 0 ? displayMetrics.heightPixels - 1 : displayMetrics.heightPixels;
+            decoderWidth = realWidth % 2 != 0 ? realWidth - 1 : realWidth;
+            decoderHeight = realHeight % 2 != 0 ? realHeight - 1 : realHeight;
 
         } else {
             decoderWidth = intent.getIntExtra("width", 0);
             decoderHeight = intent.getIntExtra("height", 0);
         }
 
+        Log.d(TAG, "onCreate: width=" + decoderWidth);
+        Log.d(TAG, "onCreate: decoderHeight=" + decoderHeight);
+
         textureView = new TextureView(this);
         textureView.setSurfaceTextureListener(this);
-        LinearLayout layout = new LinearLayout(this);
-        layout.setGravity(Gravity.CENTER);
+        FrameLayout layout = new FrameLayout(this);
+//        layout.setGravity(Gravity.CENTER);
         layout.addView(textureView);
-        LinearLayout.LayoutParams layoutParams = (LinearLayout.LayoutParams) textureView.getLayoutParams();
+        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) textureView.getLayoutParams();
         layoutParams.width = decoderWidth;
         layoutParams.height = decoderHeight;
         textureView.setLayoutParams(layoutParams);
@@ -92,6 +96,7 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     private final LinkedBlockingQueue<MotionEvent> motionEvents = new LinkedBlockingQueue<>();
 
     private static final String TAG = "MainActivity";
+
 
     @SuppressLint("ClickableViewAccessibility")
     @Override
@@ -128,17 +133,14 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
                             MotionEvent event = motionEvents.take();
                             try {
                                 oos.writeInt((int) (event.getDownTime()));
-                                oos.writeInt(event.getAction());
-                                oos.writeInt(event.getPointerCount());
+                                oos.writeByte((byte)event.getAction());
+                                oos.writeByte((byte)event.getPointerCount());
 
                                 for (int i = 0; i < event.getPointerCount(); i++) {
-                                    oos.writeInt(event.getPointerId(i));
-                                    oos.writeInt((int) event.getX(i));
-                                    oos.writeInt((int) event.getY(i));
-                                    oos.writeFloat(event.getPressure(i));
+                                    oos.writeByte(event.getPointerId(i));
+                                    oos.writeFloat(event.getX(i));
+                                    oos.writeFloat(event.getY(i));
                                 }
-                                oos.writeInt(event.getButtonState());
-                                oos.writeInt(event.getSource());
                                 oos.flush();
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
@@ -171,5 +173,9 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
 
     }
+
+//    public static int packCoordinates(int x, int y) {
+//        return (x & 0xFFFF) | ((y & 0xFFFF) << 16);
+//    }
 
 }

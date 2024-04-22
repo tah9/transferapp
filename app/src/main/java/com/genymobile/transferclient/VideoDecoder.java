@@ -2,14 +2,12 @@ package com.genymobile.transferclient;
 
 import android.media.MediaCodec;
 import android.media.MediaFormat;
-import android.os.Environment;
 import android.util.Log;
 import android.view.Surface;
 
 import androidx.annotation.NonNull;
 
 import java.io.DataInputStream;
-import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -28,47 +26,28 @@ public class VideoDecoder {
     private final Lock lock = new ReentrantLock();
 
 
+    VideoPacketCache videoPacketCache = new VideoPacketCache();
+    VideoPacketCache completePacket = new VideoPacketCache();
 
-    private boolean decodeIn(/*int inIndex*/) {
-        try {
-            Integer inIndex = inputBufferQueue.take();
-            ByteBuffer inputBuffer = _mediaCodec.getInputBuffer(inIndex);
-//            lock.lock();
-            inputBuffer.put(loadingPacket.getFullyArray(), 0, loadingPacket.getSize());
-            int size=loadingPacket.getSize();
-            long time = loadingPacket.getTime();
-//            lock.unlock();
-            _mediaCodec.queueInputBuffer(inIndex, 0, size, time, 0);
-            return true;
-        } catch (Exception ignored) {
-            return false;
-        }
-    }
-
-    VideoPacket loadingPacket = new VideoPacket();
-    VideoPacket completePacket = new VideoPacket();
-
-    private void receiver() {
-        try {
-            loadingPacket.setSize(dataInputStream.readInt());
-            loadingPacket.setTime(dataInputStream.readLong());
-            dataInputStream.readFully(loadingPacket.getFullyArray(), 0, loadingPacket.getSize());
-            //交换缓冲
-//            lock.lock();
-//            VideoPacket temp = loadingPacket;
-//            loadingPacket=completePacket;
-//            completePacket = temp;
-//            lock.unlock();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     public void startReceiver() {
         new Thread(() -> {
             while (true) {
-                receiver();
-                decodeIn();
+                try {
+                    /*
+                    接收视频流,放入可用缓冲区
+                     */
+                    videoPacketCache.setSize(dataInputStream.readInt());
+                    videoPacketCache.setTime(dataInputStream.readLong());
+                    dataInputStream.readFully(videoPacketCache.getFullyArray(), 0, videoPacketCache.getSize());
+                    Integer inIndex = inputBufferQueue.take();
+                    _mediaCodec.getInputBuffer(inIndex)
+                            .put(videoPacketCache.getFullyArray(), 0, videoPacketCache.getSize());
+                    int size = videoPacketCache.getSize();
+                    long time = videoPacketCache.getTime();
+                    _mediaCodec.queueInputBuffer(inIndex, 0, size, time, 0);
+                } catch (Exception ignored) {
+                }
             }
         }).start();
     }
@@ -77,7 +56,8 @@ public class VideoDecoder {
     private DataInputStream dataInputStream;
     private FileDescriptor fileDescriptor;
 
-    int curIndex=0;
+    int curIndex = 0;
+
     public VideoDecoder(Surface surface, int w, int h, FileDescriptor fileDescriptor, InputStream inputStream) throws FileNotFoundException {
         this.inputStream = inputStream;
         this.fileDescriptor = fileDescriptor;
@@ -101,18 +81,12 @@ public class VideoDecoder {
             _mediaCodec.setCallback(new MediaCodec.Callback() {
                 @Override
                 public void onInputBufferAvailable(@NonNull MediaCodec mediaCodec, int inIndex) {
-//                    decodeIn(inIndex);
-                    try {
-//                        Log.d(TAG, "onInputBufferAvailable: put" + inIndex);
-                        inputBufferQueue.put(inIndex);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
+                    inputBufferQueue.offer(inIndex);
                 }
 
                 @Override
                 public void onOutputBufferAvailable(@NonNull MediaCodec mediaCodec, int outIndex, @NonNull MediaCodec.BufferInfo bufferInfo) {
-                    _mediaCodec.releaseOutputBuffer(outIndex, true);
+                    _mediaCodec.releaseOutputBuffer(outIndex, bufferInfo.presentationTimeUs);
                 }
 
                 @Override
@@ -127,14 +101,6 @@ public class VideoDecoder {
 
             _mediaCodec.configure(format, surface, null, 0);
             _mediaCodec.start();
-
-//            new Thread(()->{
-//                while(true){
-//                    decodeIn();
-//                }
-//            }).start();
-//
-//            Log.d(TAG, "VideoDecoder: configure finish");
 
         } catch (Exception e) {
             e.printStackTrace();

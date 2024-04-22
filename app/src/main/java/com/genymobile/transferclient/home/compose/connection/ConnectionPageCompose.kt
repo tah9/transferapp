@@ -42,11 +42,13 @@ import com.genymobile.transferclient.home.MainVm
 
 @Composable
 fun FindNearDeviceButton(
+    vm: MainVm,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
     buttonText: String
 ) {
     TextDiv(str = "P2P连接")
+    PeersDeviceList(vm = vm)
     Button(
         onClick = onClick,
         modifier = modifier.padding(16.dp)
@@ -61,7 +63,7 @@ fun InputConnection(onClick: (String) -> Unit) {
 
     TextDiv(str = "IP直连")
 
-    var text by remember { mutableStateOf("192.168.43.1") }
+    var text by remember { mutableStateOf("") }
 
     Row(
         modifier = Modifier
@@ -78,9 +80,9 @@ fun InputConnection(onClick: (String) -> Unit) {
         ) {
             if (text.isEmpty()) {
                 Text(
-                    text = "使用IP连接",
+                    text = "固定IP连接",
                     color = Color.Gray,
-                    modifier = Modifier.align(Alignment.Center)
+                    modifier = Modifier.padding(start = 10.dp)
                 )
             }
             BasicTextField(
@@ -126,7 +128,7 @@ fun DeviceList(vm: MainVm, onClick: () -> Unit) {
                     .clickable {
                         vm.mirrorDevice(index)
                     }
-                    .height(110.dp)
+//                    .height(110.dp)
                     .padding(vertical = 8.dp)
                     .background(color = Color.White, shape = RoundedCornerShape(16.dp))
             ) {
@@ -175,4 +177,4 @@ fun DeviceList(vm: MainVm, onClick: () -> Unit) {
     }
 }
 
-private const val TAG = "FormCompose"
+const val TAG = "FormCompose"

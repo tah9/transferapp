@@ -88,7 +88,7 @@ class ActivityHome : ComponentActivity() {
                             })
                             if (vm.showTransferAppDialog.value) {
                                 DeviceListDialog(
-                                    title = "选择接力设备",
+                                    title = "选择流转设备",
                                     vm = vm,
                                     vm.showTransferAppDialog,
                                     onDeviceClick = {

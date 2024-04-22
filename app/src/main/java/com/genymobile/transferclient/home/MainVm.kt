@@ -2,8 +2,11 @@ package com.genymobile.transferclient.home
 
 import android.app.Activity
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Point
 import android.net.Uri
+import android.net.wifi.p2p.WifiP2pDevice
+import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
 import android.os.Environment
 import android.util.Log
@@ -15,6 +18,7 @@ import androidx.room.Room
 import com.genymobile.transfer.ITransferInterface
 import com.genymobile.transferclient.MainActivity
 import com.genymobile.transferclient.config.PortConfig
+import com.genymobile.transferclient.home.compose.connection.PeersViewModel
 import com.genymobile.transferclient.home.data.ApplicationInfo
 import com.genymobile.transferclient.home.data.Device
 import com.genymobile.transferclient.home.data.DownloadHistory
@@ -37,12 +41,15 @@ import java.io.ObjectOutputStream
 import java.net.ServerSocket
 import java.net.Socket
 import java.text.DecimalFormat
+import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.thread
 
 
 class MainVm(val mContext: Activity) : ViewModel() {
     private val scope = viewModelScope
     private val TAG = "MainVm"
+    val peersViewModel = PeersViewModel(this)
+
 
     class CustomSocket(
         var socket: Socket
@@ -51,18 +58,16 @@ class MainVm(val mContext: Activity) : ViewModel() {
         val inputStream = socket.getInputStream()
         val dataOutputStream = DataOutputStream(outputStream)
         val dataInputStream = DataInputStream(inputStream)
-//        val objectOutputStream = ObjectOutputStream(outputStream)
-//        val objectInputStream = ObjectInputStream(inputStream)
     }
 
     var listHistory = mutableStateListOf<DownloadHistory>()
+    val peersDevices = mutableStateListOf<WifiP2pDevice>() //扫描到的设备列表
 
     val devicesList = mutableStateListOf<Device>()
     val socketList = mutableStateListOf<CustomSocket>()
     var homeActiveIndex = mutableStateOf(0)
     val kernelRunning = mutableStateOf(false)
 
-    var transferService: ITransferInterface? = null
     var mainSocket: CustomSocket? = null
 
     var showTransferFileDialog = mutableStateOf(false)
@@ -97,7 +102,9 @@ class MainVm(val mContext: Activity) : ViewModel() {
                 }
             }
         }
+        peersViewModel.initPeersScanner()
     }
+
 
     val format = DecimalFormat("#.0")
 
@@ -132,6 +139,7 @@ class MainVm(val mContext: Activity) : ViewModel() {
             Log.d(TAG, "FilesContainer: sizeFromUri$sizeFromUri")
             val dataOutputStream = customSocket.dataOutputStream
             dataOutputStream.writeInt(MessageType.FILE)
+
             dataOutputStream.writeUTF(uriInfo.second)
             dataOutputStream.writeLong(sizeFromUri)
             val inputStream = mContext.contentResolver.openInputStream(transferFileUri)
@@ -185,6 +193,7 @@ class MainVm(val mContext: Activity) : ViewModel() {
                         .putExtra("host", host)
                         .putExtra("dynamicPort", dynamicPort)
                         .putExtra("type", "appRelay")
+                    intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
                     mContext.startActivity(intent)
                 }
                 //被镜像
@@ -197,18 +206,33 @@ class MainVm(val mContext: Activity) : ViewModel() {
                     mainSocket!!.dataOutputStream.writeInt(MessageType.MIRROR)
                     //接收分配的端口
                     val dynamicPort = mainSocket!!.dataInputStream.readInt()
+                    Log.d(TAG, "receiverListener: 交互app收到端口 dynamicPort")
                     //将端口发送给远程设备
+                    remoteSocket.dataOutputStream.writeInt(MessageType.MIRROR_PORT)
+                    remoteSocket.dataOutputStream.writeInt(remoteSocket.dataInputStream.readInt())
                     remoteSocket.dataOutputStream.writeInt(dynamicPort)
+                    Log.d(TAG, "receiverListener: 交互app发送端口 dynamicPort")
+                } else if (messageType == MessageType.MIRROR_PORT) {
+                    val remoteDevice = devicesList[remoteSocket.dataInputStream.readInt()]
+                    val dynamicPort = remoteSocket.dataInputStream.readInt()
+                    val intent = Intent(mContext, MainActivity::class.java)
+                    intent.putExtra("host", remoteSocket.socket.inetAddress.hostAddress)
+                    intent.putExtra("dynamicPort", dynamicPort)
+                    intent.putExtra("type", "mirror")
+                    intent.putExtra("width", remoteDevice.width)
+                    intent.putExtra("height", remoteDevice.height)
+                    intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK
+                    mContext.startActivity(intent)
                 }
                 //接受文件
+                // todo 可能需要使用单独的socket
                 else if (messageType == MessageType.FILE) {
                     Log.d(TAG, "receiverListener: file")
                     val fileName = dataInputStream.readUTF()
                     val fileSize = dataInputStream.readLong()
 
                     // 创建文件输出流准备写入接收到的文件数据
-                    val outputFile =
-                        File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)!!.absolutePath + "/" + fileName)
+                    val outputFile = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)!!.absolutePath + "/" + fileName)
 
                     val newHistory = DownloadHistory(
                         fileName = fileName,
@@ -221,10 +245,8 @@ class MainVm(val mContext: Activity) : ViewModel() {
                         listHistory.add(0, newHistory)
                     }
 
-
-//                    if (outputFile.exists()) outputFile.delete()
-
                     val fileOutputStream = FileOutputStream(outputFile)
+
 
                     // 缓冲区
                     val buffer = ByteArray(8192)
@@ -235,6 +257,7 @@ class MainVm(val mContext: Activity) : ViewModel() {
                     while (true) {
                         readBytesLength = dataInputStream.readInt()
                         if (readBytesLength == -1) {
+                            Log.d(TAG, "receiverListener: endFile")
                             // 文件传输结束标志
                             break
                         }
@@ -252,6 +275,7 @@ class MainVm(val mContext: Activity) : ViewModel() {
                                 status = "接收中(${format.format(progress * 100)}%)"
                             )
                         }
+
 
                         // 可以在这里打印或处理进度信息
                         Log.d("Receiver: ", "Progress: $progress")
@@ -281,18 +305,11 @@ class MainVm(val mContext: Activity) : ViewModel() {
         3 交互程序通知连接的设备接收新端口
         4 交互程序将host和端口发送给它
          */
+        Log.d(TAG, "mirrorDevice: ")
         thread {
             val customSocket = socketList[deviceIndex]
             customSocket.dataOutputStream.writeInt(MessageType.MIRROR)
-            val dynamicPort = customSocket.dataInputStream.readInt()
-            val intent = Intent(mContext, MainActivity::class.java)
-            intent.putExtra("host", customSocket.socket.inetAddress.hostAddress)
-            intent.putExtra("dynamicPort", dynamicPort)
-            intent.putExtra("type", "mirror")
-            val remoteDevice = devicesList[deviceIndex]
-            intent.putExtra("width", remoteDevice.width)
-            intent.putExtra("height", remoteDevice.height)
-            mContext.startActivity(intent)
+            customSocket.dataOutputStream.writeInt(deviceIndex)
         }
     }
 
@@ -368,6 +385,8 @@ class MainVm(val mContext: Activity) : ViewModel() {
         }
     }
 
+    val mutex = ReentrantLock()
+
     //主动连接
     fun initiativeSocket(it: String) {
         /*
@@ -376,15 +395,19 @@ class MainVm(val mContext: Activity) : ViewModel() {
         然后读取被连接的一方设备信息。
          */
         Log.d(TAG, "RootContainer:1 $it")
+
+
+
         thread {
-            val otherSocket = Socket(it, PortConfig.DEVICE_PORT)
-            val customSocket = CustomSocket(otherSocket)
+
+
+            val customSocket = CustomSocket(Socket(it, PortConfig.DEVICE_PORT))
             socketList.add(customSocket)
             Log.d(TAG, "RootContainer:2 $it")
 
             Log.d(TAG, "RootContainer: 已连接")
-            val outputStream = otherSocket.getOutputStream()
-            val inputStream = otherSocket.getInputStream()
+            val outputStream = customSocket.outputStream
+            val inputStream = customSocket.inputStream
 
 
             val objectOutputStream = ObjectOutputStream(outputStream)
@@ -395,7 +418,17 @@ class MainVm(val mContext: Activity) : ViewModel() {
             objectOutputStream.flush()
 
             val remoteDevice = objectInputStream.readObject() as Device
-            devicesList.add(remoteDevice)
+            scope.launch(Dispatchers.Main) {
+//                mutex.lock()
+//                for (item in socketList) {
+//                    if (item.socket.inetAddress.hostAddress == it) {
+//                        mutex.unlock()
+//                        return@launch
+//                    }
+//                }
+                devicesList.add(remoteDevice)
+//                mutex.unlock()
+            }
 
             receiverListener(
                 objectOutputStream,

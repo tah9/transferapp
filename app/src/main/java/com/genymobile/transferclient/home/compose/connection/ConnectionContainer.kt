@@ -14,15 +14,21 @@ fun ConnectionContainer(vm: MainVm) {
     Column(
         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 50.dp)
     ) {
-        CapturePermission(vm)
+//        CapturePermission(vm)
+
+
         FindNearDeviceButton(
-            onClick = { /* 处理按钮点击 */ },
+            vm = vm,
+            onClick = {
+                vm.peersViewModel.initPeersScanner()
+            },
             buttonText = "扫描附近的设备",
             modifier = Modifier.align(Alignment.CenterHorizontally)
         )
         InputConnection {
             vm.initiativeSocket(it)
         }
+        TextDiv(str = "已连接设备")
         DeviceList(vm) {
             Log.d("TAG", "DeviceList: click")
         }

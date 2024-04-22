@@ -1,15 +1,14 @@
 package com.genymobile.transferclient;
 
-public class VideoPacket {
-   private int size;
-   private long time;
-   private byte[] data = new byte[1_000_000];
+public class VideoPacketCache {
+    private int size;
+    private long time;
+    private byte[] data = new byte[1_000_000];
 
 
 //    private int dumpSize;
 //    private long dumpTime;
 //    private byte[] dumpData = new byte[1_000_000];
-
 
 
 //    public VideoPacket dump() {

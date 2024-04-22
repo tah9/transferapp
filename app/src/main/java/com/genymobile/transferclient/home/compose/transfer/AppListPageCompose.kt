@@ -64,6 +64,7 @@ fun DeviceItem(device: Device, onClick: () -> Unit) {
         Modifier
             .clickable(onClick = onClick)
             .background(Color.White)
+            .fillMaxWidth()
             .padding(8.dp)
             .height(50.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -72,7 +73,7 @@ fun DeviceItem(device: Device, onClick: () -> Unit) {
             painter = imagePainter,
             contentDescription = "SVG Image",
             modifier = Modifier
-                .size(30.dp)
+                .size(40.dp)
                 .background(/*Color(0xff495d92)*/Color.Transparent)
                 .padding(vertical = 5.dp),
             contentScale = ContentScale.Fit,
