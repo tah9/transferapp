@@ -26,8 +26,7 @@ import com.genymobile.transferclient.home.compose.TabView
 import com.genymobile.transferclient.home.compose.connection.ConnectionContainer
 import com.genymobile.transferclient.home.compose.file.FilesContainer
 import com.genymobile.transferclient.home.compose.transfer.AppListContainer
-import com.genymobile.transferclient.tools.getUriInfo
-import com.genymobile.transferclient.tools.requestReadWritePermissions
+import com.genymobile.transferclient.tools.requestPermissions
 
 
 class ActivityHome : ComponentActivity() {
@@ -66,9 +65,9 @@ class ActivityHome : ComponentActivity() {
         super.onCreate(savedInstanceState)
 //        enableEdgeToEdge() //全屏显示
 
-        requestReadWritePermissions()
+        requestPermissions()
 
-
+//        RunProcess.runProcessAsync("su")
         setContent {
             MyApplicationTheme() {
                 Surface(

@@ -34,9 +34,6 @@ public class VideoDecoder {
         new Thread(() -> {
             while (true) {
                 try {
-                    /*
-                    接收视频流,放入可用缓冲区
-                     */
                     videoPacketCache.setSize(dataInputStream.readInt());
                     videoPacketCache.setTime(dataInputStream.readLong());
                     dataInputStream.readFully(videoPacketCache.getFullyArray(), 0, videoPacketCache.getSize());

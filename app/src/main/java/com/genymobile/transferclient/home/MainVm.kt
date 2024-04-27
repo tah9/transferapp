@@ -16,6 +16,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import com.genymobile.transfer.ITransferInterface
+import com.genymobile.transferclient.IO.readFully
 import com.genymobile.transferclient.MainActivity
 import com.genymobile.transferclient.config.PortConfig
 import com.genymobile.transferclient.home.compose.connection.PeersViewModel
@@ -109,9 +110,14 @@ class MainVm(val mContext: Activity) : ViewModel() {
     val format = DecimalFormat("#.0")
 
     fun uploadFile(index: Int) {
-        thread {
+
+        scope.launch(Dispatchers.IO) {
 
             val customSocket = socketList[index]
+            customSocket.dataOutputStream.writeInt(MessageType.FILE)
+            val fileServerSocket = ServerSocket(0)
+            //将动态通信端口发送出去
+            customSocket.dataOutputStream.writeInt(fileServerSocket.localPort)
             /*
                发送文件
               0 发送文件名称
@@ -129,7 +135,7 @@ class MainVm(val mContext: Activity) : ViewModel() {
                 downloadPath = transferFileUri.toString(),
                 status = "发送中"
             )
-            scope.launch(Dispatchers.Main) {
+            withContext(Dispatchers.Main) {
                 listHistory.add(0, newHistory)
             }
 
@@ -137,21 +143,21 @@ class MainVm(val mContext: Activity) : ViewModel() {
             val transferFileUri = transferFileUri!!
             val sizeFromUri = uriInfo.first
             Log.d(TAG, "FilesContainer: sizeFromUri$sizeFromUri")
-            val dataOutputStream = customSocket.dataOutputStream
-            dataOutputStream.writeInt(MessageType.FILE)
 
-            dataOutputStream.writeUTF(uriInfo.second)
-            dataOutputStream.writeLong(sizeFromUri)
+            val customFileSocket = CustomSocket(fileServerSocket.accept())
+
+            customFileSocket.dataOutputStream.writeUTF(uriInfo.second)
+            customFileSocket.dataOutputStream.writeLong(sizeFromUri)
             val inputStream = mContext.contentResolver.openInputStream(transferFileUri)
             val buffer = ByteArray(8192)
             var readBytesLength: Int
             var currentSize: Long = 0
             while (inputStream!!.read(buffer).also { readBytesLength = it } > 0) {
-                dataOutputStream.writeInt(readBytesLength)
-                dataOutputStream.write(buffer, 0, readBytesLength)
+                customFileSocket.dataOutputStream.writeInt(readBytesLength)
+                customFileSocket.dataOutputStream.write(buffer, 0, readBytesLength)
                 currentSize += readBytesLength
                 val progress: Float = currentSize / sizeFromUri.toFloat()
-                dataOutputStream.writeFloat(progress)
+                customFileSocket.dataOutputStream.writeFloat(progress)
                 scope.launch(Dispatchers.Main) {
                     listHistory[0] = listHistory.first().copy(
                         status = "发送中(${format.format(progress * 100)}%)"
@@ -159,8 +165,9 @@ class MainVm(val mContext: Activity) : ViewModel() {
                 }
                 Log.d("FilesContainer: ", "FilesContainer: progress=$progress")
             }
-            dataOutputStream.writeInt(-1)
-            scope.launch(Dispatchers.Main) {
+            customFileSocket.dataOutputStream.writeInt(-1)
+            customFileSocket.socket.close()
+            withContext(Dispatchers.Main) {
                 listHistory[0] = listHistory.first().copy(
                     status = "发送完成"
                 )
@@ -225,67 +232,77 @@ class MainVm(val mContext: Activity) : ViewModel() {
                     mContext.startActivity(intent)
                 }
                 //接受文件
-                // todo 可能需要使用单独的socket
                 else if (messageType == MessageType.FILE) {
                     Log.d(TAG, "receiverListener: file")
-                    val fileName = dataInputStream.readUTF()
-                    val fileSize = dataInputStream.readLong()
+                    //接收动态分配的端口，后续通信都使用新通道端口
+                    val dynamicPort = dataInputStream.readInt()
+                    scope.launch(Dispatchers.IO) {
 
-                    // 创建文件输出流准备写入接收到的文件数据
-                    val outputFile = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)!!.absolutePath + "/" + fileName)
+                        val fileCustomSocket = CustomSocket(Socket(host, dynamicPort))
+                        val fileName = fileCustomSocket.dataInputStream.readUTF()
+                        val fileSize = fileCustomSocket.dataInputStream.readLong()
 
-                    val newHistory = DownloadHistory(
-                        fileName = fileName,
-                        fileSize = fileSize,
-                        downloadTime = System.currentTimeMillis(),
-                        downloadPath = transferFileUri.toString(),
-                        status = "接收中"
-                    )
-                    scope.launch(Dispatchers.Main) {
-                        listHistory.add(0, newHistory)
-                    }
+                        // 创建文件输出流写入接收到的文件数据
+                        val outputFile =
+                            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)!!.absolutePath + "/" + fileName)
 
-                    val fileOutputStream = FileOutputStream(outputFile)
-
-
-                    // 缓冲区
-                    val buffer = ByteArray(8192)
-                    var readBytesLength: Int
-                    var currentSize: Long = 0
-
-                    // 开始接收文件数据
-                    while (true) {
-                        readBytesLength = dataInputStream.readInt()
-                        if (readBytesLength == -1) {
-                            Log.d(TAG, "receiverListener: endFile")
-                            // 文件传输结束标志
-                            break
-                        }
-
-                        // 读取数据块
-                        dataInputStream.readFully(buffer, 0, readBytesLength)
-                        fileOutputStream.write(buffer, 0, readBytesLength)
-
-                        currentSize += readBytesLength
-
-                        // 可以读取进度信息，但在这个示例中我们仅接收文件，不处理进度
-                        val progress: Float = dataInputStream.readFloat()
-                        scope.launch(Dispatchers.Main) {
-                            listHistory[0] = listHistory.first().copy(
-                                status = "接收中(${format.format(progress * 100)}%)"
-                            )
-                        }
-
-
-                        // 可以在这里打印或处理进度信息
-                        Log.d("Receiver: ", "Progress: $progress")
-                    }
-                    scope.launch(Dispatchers.Main) {
-                        listHistory[0] = listHistory.first().copy(
-                            status = "接收完成"
+                        val newHistory = DownloadHistory(
+                            fileName = fileName,
+                            fileSize = fileSize,
+                            downloadTime = System.currentTimeMillis(),
+                            downloadPath = transferFileUri.toString(),
+                            status = "接收中"
                         )
-                        withContext(Dispatchers.IO) {
-                            downloadHistoryDao.insert(listHistory.first())
+                        withContext(Dispatchers.Main) {
+                            listHistory.add(0, newHistory)
+                        }
+
+                        val fileOutputStream = FileOutputStream(outputFile)
+
+
+                        // 缓冲区
+                        val buffer = ByteArray(8192)
+                        var readBytesLength: Int
+                        var currentSize: Long = 0
+
+                        // 开始接收文件数据
+                        while (true) {
+                            readBytesLength = fileCustomSocket.dataInputStream.readInt()
+                            if (readBytesLength == -1) {
+                                Log.d(TAG, "receiverListener: endFile")
+                                // 文件传输结束标志
+                                break
+                            }
+
+                            // 读取数据块
+                            fileCustomSocket.dataInputStream.readFully(buffer, 0, readBytesLength)
+                            fileOutputStream.write(buffer, 0, readBytesLength)
+
+                            currentSize += readBytesLength
+
+                            // 可以读取进度信息，但在这个示例中我们仅接收文件，不处理进度
+                            val progress: Float = fileCustomSocket.dataInputStream.readFloat()
+                            scope.launch(Dispatchers.Main) {
+                                listHistory[0] = listHistory.first().copy(
+                                    status = "接收中(${format.format(progress * 100)}%)"
+                                )
+                            }
+
+
+                            // 可以在这里打印或处理进度信息
+                            Log.d("Receiver: ", "Progress: $progress")
+                        }
+
+                        //文件传输完毕，销毁通道
+                        fileCustomSocket.socket.close()
+
+                        withContext(Dispatchers.Main) {
+                            listHistory[0] = listHistory.first().copy(
+                                status = "接收完成"
+                            )
+                            withContext(Dispatchers.IO) {
+                                downloadHistoryDao.insert(listHistory.first())
+                            }
                         }
                     }
                 }
@@ -353,10 +370,18 @@ class MainVm(val mContext: Activity) : ViewModel() {
             val serverSocket = ServerSocket(PortConfig.DEVICE_PORT)
             Log.d(TAG, "onCreate: 等待其他设备连接")
             while (true) {
+//                passivityMutex.lock()
                 //每个其他的设备主动连接该设备
                 val fromOtherDeviceSocket = serverSocket.accept()
                 val customSocket = CustomSocket(fromOtherDeviceSocket)
+//                for (itemSocket in socketList) {
+//                    if (itemSocket.socket.inetAddress.hostAddress==fromOtherDeviceSocket.inetAddress.hostAddress){
+//                        passivityMutex.unlock()
+//                        return@thread
+//                    }
+//                }
                 socketList.add(customSocket)
+//                passivityMutex.unlock()
                 Log.d(TAG, "被动连接->新设备连接")
                 //
                 thread {
@@ -386,6 +411,7 @@ class MainVm(val mContext: Activity) : ViewModel() {
     }
 
     val mutex = ReentrantLock()
+    val passivityMutex = ReentrantLock()
 
     //主动连接
     fun initiativeSocket(it: String) {
@@ -394,15 +420,21 @@ class MainVm(val mContext: Activity) : ViewModel() {
         主动连接的一方发送自己的设备信息，
         然后读取被连接的一方设备信息。
          */
-        Log.d(TAG, "RootContainer:1 $it")
-
-
+        Log.d(TAG, "RootContainer:initiativeSocket $it")
 
         thread {
-
-
+            mutex.lock()
+            for (itemSocket in socketList) {
+                if (itemSocket.socket.inetAddress.hostAddress == it) {
+                    mutex.unlock()
+                    Log.d(TAG, "initiativeSocket: unlock1")
+                    return@thread
+                }
+            }
             val customSocket = CustomSocket(Socket(it, PortConfig.DEVICE_PORT))
             socketList.add(customSocket)
+            mutex.unlock()
+            Log.d(TAG, "initiativeSocket: unlock2")
             Log.d(TAG, "RootContainer:2 $it")
 
             Log.d(TAG, "RootContainer: 已连接")
@@ -419,15 +451,7 @@ class MainVm(val mContext: Activity) : ViewModel() {
 
             val remoteDevice = objectInputStream.readObject() as Device
             scope.launch(Dispatchers.Main) {
-//                mutex.lock()
-//                for (item in socketList) {
-//                    if (item.socket.inetAddress.hostAddress == it) {
-//                        mutex.unlock()
-//                        return@launch
-//                    }
-//                }
                 devicesList.add(remoteDevice)
-//                mutex.unlock()
             }
 
             receiverListener(
@@ -509,21 +533,15 @@ class MainVm(val mContext: Activity) : ViewModel() {
 
     suspend fun scannerApps() {
         withContext(Dispatchers.IO) {
-
             val deferredAppInfos = async(Dispatchers.IO) {
                 val packageInfos = mContext.getPackageManager().getInstalledPackages(0)
                 val packageManager = mContext.packageManager
-
                 val applicationInfos = mutableListOf<ApplicationInfo>()
                 packageInfos.forEach { packageInfo ->
                     if (packageManager.getLaunchIntentForPackage(packageInfo.packageName) != null) {
-                        val appName =
-                            packageInfo.applicationInfo.loadLabel(packageManager).toString()
+                        val appName =packageInfo.applicationInfo.loadLabel(packageManager).toString()
                         val appIcon = packageInfo.applicationInfo.loadIcon(packageManager)
                         val packageName = packageInfo.packageName
-//                        val compressToBase64 = appIcon.compressToBase64(64, 64)!!
-
-//                            Log.d(TAG, "AppListContainer: $compressToBase64")
                         val appInfo =
                             ApplicationInfo(
                                 appName,
@@ -540,12 +558,9 @@ class MainVm(val mContext: Activity) : ViewModel() {
                                     appName.firstOrNull()?.uppercaseChar() ?: '_'
                                 }
                             )
-//                            }
                         applicationInfos.add(appInfo)
                     }
                 }
-
-                // 排序和分组也在IO调度器上完成，但分组键的获取要在主线程，因为它涉及到字符串访问
                 val sorted = applicationInfos.sortedBy { it.pin }
                 sorted.groupBy { it.pin }
             }

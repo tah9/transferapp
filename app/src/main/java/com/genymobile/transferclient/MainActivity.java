@@ -110,8 +110,6 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
                 Log.d(TAG, "socket connection finish " + dynamicPort);
                 InputStream inputStream = videoSocket.getInputStream();
                 FileDescriptor fileDescriptor = ParcelFileDescriptor.fromSocket(videoSocket).getFileDescriptor();
-//                videoSocket.close();
-
 
                 VideoDecoder videoDecoder = new VideoDecoder(new Surface(surface),
                         decoderWidth,

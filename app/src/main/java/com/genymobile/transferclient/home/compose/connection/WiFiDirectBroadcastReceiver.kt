@@ -22,7 +22,6 @@ class WiFiDirectBroadcastReceiver(
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
-                //发现设备
                 manager.requestPeers(channel) { peerList: WifiP2pDeviceList? ->
                     vm.peersDevices.clear()
                     for (wifiP2pDevice in peerList!!.deviceList) {
@@ -32,19 +31,13 @@ class WiFiDirectBroadcastReceiver(
             }
 
             WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
-                //此处状态检测触发频繁，要避免反复触发，做好标志位
                 manager.requestConnectionInfo(channel,
                     object : WifiP2pManager.ConnectionInfoListener {
                         override fun onConnectionInfoAvailable(info: WifiP2pInfo) {
                             if (info.groupOwnerAddress == null) return
-                            Log.d(TAG, "onConnectionInfoAvailable: ${info}")
                             val host = info.groupOwnerAddress.hostAddress
-                            Log.d(TAG, "onConnectionInfoAvailable: $host")
 
-                            if (info.isGroupOwner) {
-                                // 如果当前设备是群组所有者
-                            } else {
-                                // 如果当前设备是客户端
+                            if (!info.isGroupOwner) {
                                 vm.initiativeSocket(host)
                             }
                             return
